@@ -1,0 +1,52 @@
+# Render Blueprint for Novesta (https://novesta.online)
+# Connect your GitHub repository in Render -> New -> Web Service (or Blueprint)
+services:
+  - type: web
+    name: novesta-web
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: APP_URL
+        value: https://novesta.online
+      - key: SMTP_HOST
+        value: smtp.hostinger.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_SECURE
+        value: "true"
+      - key: SMTP_USER
+        value: hello@novesta.online
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        value: Novesta <hello@novesta.online>
+      - key: CONTACT_TO_EMAIL
+        value: hello@novesta.online
+      - key: FOUNDER_BACKUP_EMAIL
+        value: rajputpawan9765@gmail.com
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: FOUNDER_ADMIN_KEY
+        sync: false
+      - key: FOUNDER_EMAILS
+        value: rajputpawan9765@gmail.com,hello@novesta.online,novesta111@gmail.com
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false

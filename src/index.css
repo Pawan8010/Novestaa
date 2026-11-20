@@ -1,0 +1,368 @@
+@import "tailwindcss";
+
+:root {
+  /* Resend-inspired Tokenized Dark-First Design System */
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #a1a4a5;
+  --color-text-tertiary: #fcfdff;
+  --color-text-inverse: #f1f7fe;
+
+  --color-surface-base: #000000;
+  --color-surface-subtle: #08090d;
+  --color-surface-elevated: #0e1118;
+  --color-surface-card: rgba(255, 255, 255, 0.028);
+  --color-surface-muted: #d6ebfd;
+  --color-surface-raised: #00a3ff;
+  --color-surface-strong: #d3edf8;
+
+  /* Semantic Aliases used across components */
+  --color-bg: var(--color-surface-base);
+  --color-bg-subtle: var(--color-surface-subtle);
+  --color-ink: var(--color-text-primary);
+  --color-ink-secondary: var(--color-text-secondary);
+  --color-ink-tertiary: #8d9296;
+  --color-border: rgba(214, 235, 253, 0.12);
+  --color-border-strong: rgba(214, 235, 253, 0.24);
+  --color-logo-badge: #000000;
+
+  /* Crisp Luminous Primary Button Tokens (>18:1 WCAG AAA contrast) */
+  --color-btn-primary-bg: #f1f7fe;
+  --color-btn-primary-hover: #d6ebfd;
+  --color-btn-primary-ink: #000000;
+
+  /* Dark Container Surface Tokens (Contact, Feedback Form, Globe) */
+  --color-surface-inverse: #000000;
+  --color-inverse-bg: #08090d;
+  --color-inverse-ink: #f0f0f0;
+  --color-inverse-muted: #a1a4a5;
+  --color-inverse-border: rgba(214, 235, 253, 0.14);
+  --color-accent: var(--color-surface-raised);
+
+  /* Electric Sky Signal & Globe Tokens */
+  --color-accent-signal: #00a3ff;
+  --color-globe-dot: rgba(211, 237, 248, 0.36);
+  --color-globe-hairline: rgba(214, 235, 253, 0.14);
+
+  /* Glow Card & Accent Tokens */
+  --color-glow-bg: #04070d;
+  --color-glow-navy: rgba(0, 163, 255, 0.16);
+  --color-glow-ring: #00a3ff;
+  --color-glow-ring-soft: rgba(0, 163, 255, 0.36);
+  --color-confetti-blue: #00a3ff;
+  --color-confetti-indigo: #60a5fa;
+  --color-confetti-sky: #d6ebfd;
+  --color-confetti-slate: #a1a4a5;
+  --color-confetti-tint: rgba(0, 163, 255, 0.12);
+  --color-confetti-tint-dark: rgba(0, 163, 255, 0.22);
+  --color-confetti-tint-ink: #d6ebfd;
+  --color-confetti-tint-ink-inverse: #d6ebfd;
+
+  /* Hero Interactive Ambient Particle Field Tokens (Obsidian + Sky Spectrum) */
+  --color-particle-blue: #00a3ff;
+  --color-particle-indigo: #60a5fa;
+  --color-particle-red: #d6ebfd;
+  --color-particle-amber: #d3edf8;
+  --color-particle-teal: #38bdf8;
+  --color-particle-slate: #a1a4a5;
+
+  /* Accessible Dark-Mode Semantic Feedback Tokens (WCAG 2.2 AA) */
+  --color-success: #4ade80;
+  --color-error: #ff8b82;
+  --color-error-inverse: #ff8b82;
+  --color-error-bg-inverse: rgba(255, 139, 130, 0.12);
+  --color-warning-bg: #0b0e14;
+  --color-warning-border: rgba(0, 163, 255, 0.45);
+  --color-warning-text: #f0f0f0;
+
+  /* Spacing Scale Tokens */
+  --space-1: 1px;
+  --space-2: 2px;
+  --space-3: 4px;
+  --space-4: 5px;
+  --space-5: 6px;
+  --space-6: 8px;
+  --space-7: 10px;
+  --space-8: 12px;
+
+  /* Radius Scale Tokens */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 9999px;
+  --radius-card: 16px;
+  --radius-step7: 24px;
+  --radius-step8: 9999px;
+
+  /* Elevation Tokens */
+  --shadow-1: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 2px 0 rgba(0, 0, 0, 0.45), 0 20px 50px -12px rgba(0, 0, 0, 0.75);
+  --shadow-4: 0 4px 16px -3px rgba(0, 0, 0, 0.65);
+  --shadow-glow: 0 0 0 1px rgba(0, 163, 255, 0.25), 0 12px 40px -12px rgba(0, 163, 255, 0.24);
+
+  /* Typography Scale Tokens */
+  --font-family-primary: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+  --type-xs: 12px;
+  --type-sm: 14px;
+  --type-md: 16px;
+  --type-lg: 18px;
+  --type-xl: 20px;
+  --type-2xl: 24px;
+  --type-3xl: 56px;
+  --type-4xl: 76.8px;
+
+  /* Motion Tokens */
+  --motion-instant: 150ms;
+  --motion-fast: 200ms;
+  --motion-normal: 500ms;
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
+  --font-sans: var(--font-family-primary);
+  --font-mono: var(--font-family-mono);
+
+  --color-bg: var(--color-bg);
+  --color-bg-subtle: var(--color-bg-subtle);
+  --color-ink: var(--color-ink);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-ink-tertiary: var(--color-ink-tertiary);
+  --color-border: var(--color-border);
+  --color-inverse-bg: var(--color-inverse-bg);
+  --color-inverse-ink: var(--color-inverse-ink);
+  --color-inverse-muted: var(--color-inverse-muted);
+  --color-inverse-border: var(--color-inverse-border);
+  --color-surface-inverse: var(--color-surface-inverse);
+  --color-accent-signal: var(--color-accent-signal);
+  --color-globe-dot: var(--color-globe-dot);
+  --color-globe-hairline: var(--color-globe-hairline);
+  --color-accent: var(--color-accent);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-step7: var(--radius-step7);
+  --radius-step8: var(--radius-step8);
+
+  --shadow-2: var(--shadow-2);
+  --shadow-4: var(--shadow-4);
+}
+
+html {
+  scroll-behavior: auto;
+  color-scheme: dark;
+  font-family: var(--font-family-primary);
+  font-size: 16px;
+  line-height: 24px;
+  background-color: var(--color-surface-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-weight: 400;
+  font-size: var(--type-md);
+  line-height: 24px;
+  background-color: var(--color-surface-base);
+  color: var(--color-text-primary);
+  overflow-x: clip;
+}
+
+/* Native dark select menus */
+select option {
+  background-color: #08090d;
+  color: #f0f0f0;
+}
+
+/* WCAG 2.2 AA Focus Indicators (Keyboard-First) */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-surface-raised);
+  outline-offset: 2px;
+}
+
+/* Structured Tokenized Typography */
+.mono-eyebrow {
+  font-family: var(--font-family-mono);
+  font-size: var(--type-xs);
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.resend-gradient-text {
+  background: linear-gradient(180deg, #fcfdff 0%, #f0f0f0 58%, #a1a4a5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.heading-hero {
+  font-size: clamp(38px, 6.2vw, 76.8px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.heading-section {
+  font-size: clamp(1.85rem, 4vw, 3.5rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.heading-city {
+  font-size: clamp(44px, 4.8vw, 64px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.heading-founder {
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.heading-sub {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* Resend Luminous Ambient Spotlights */
+.resend-spotlight-hero {
+  background-image:
+    radial-gradient(65% 48% at 50% 0%, rgba(0, 163, 255, 0.14) 0%, rgba(214, 235, 253, 0.04) 42%, transparent 72%),
+    radial-gradient(45% 32% at 50% 10%, rgba(211, 237, 248, 0.07) 0%, transparent 65%);
+}
+
+.resend-spotlight-subtle {
+  background-image: radial-gradient(
+    55% 40% at 50% 0%,
+    rgba(0, 163, 255, 0.09) 0%,
+    transparent 70%
+  );
+}
+
+/* Resend Hairline & Obsidian Glass Cards */
+.novesta-glow-surface {
+  background-color: var(--color-glow-bg);
+  background-image:
+    radial-gradient(62% 58% at 0% 0%, var(--color-glow-navy) 0%, transparent 65%),
+    radial-gradient(62% 58% at 100% 100%, rgba(214, 235, 253, 0.08) 0%, transparent 65%);
+}
+
+.novesta-glow-text {
+  text-shadow: 0 0 28px var(--color-glow-ring-soft);
+}
+
+.novesta-card {
+  background: linear-gradient(180deg, rgba(214, 235, 253, 0.045) 0%, rgba(255, 255, 255, 0.015) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition:
+    border-color var(--motion-fast) var(--ease-settle),
+    background-color var(--motion-fast) var(--ease-settle),
+    box-shadow var(--motion-fast) var(--ease-settle);
+}
+
+.novesta-card:hover {
+  border-color: rgba(0, 163, 255, 0.45);
+  box-shadow: var(--shadow-glow);
+}
+
+.novesta-card-subtle {
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition:
+    border-color var(--motion-fast) var(--ease-settle),
+    background-color var(--motion-fast) var(--ease-settle);
+}
+
+.novesta-card-subtle:hover {
+  border-color: var(--color-border-strong);
+  background-color: var(--color-surface-elevated);
+}
+
+/* Resend Primary & Secondary Tokenized Buttons */
+.resend-btn-primary {
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-ink);
+  border: 1px solid rgba(252, 253, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 3px rgba(0, 0, 0, 0.45);
+  transition:
+    background-color var(--motion-instant) var(--ease-settle),
+    box-shadow var(--motion-fast) var(--ease-settle),
+    transform var(--motion-instant) var(--ease-settle);
+}
+
+.resend-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-btn-primary-hover);
+  box-shadow: 0 0 24px rgba(0, 163, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.resend-btn-primary:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.resend-btn-secondary {
+  background-color: rgba(214, 235, 253, 0.04);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  transition:
+    border-color var(--motion-instant) var(--ease-settle),
+    background-color var(--motion-instant) var(--ease-settle),
+    color var(--motion-instant) var(--ease-settle);
+}
+
+.resend-btn-secondary:hover:not(:disabled) {
+  background-color: rgba(214, 235, 253, 0.09);
+  border-color: rgba(0, 163, 255, 0.5);
+  color: var(--color-text-tertiary);
+}
+
+/* Dark Frosted Glass Surface */
+.novesta-glass {
+  background-color: rgba(8, 9, 13, 0.82);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(214, 235, 253, 0.08),
+    var(--shadow-2);
+}
+
+/* Subtle Architectural Dot Grid for Obsidian Surfaces */
+.novesta-arch-grid {
+  background-image: radial-gradient(rgba(214, 235, 253, 0.14) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 42%, black 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 42%, black 30%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
