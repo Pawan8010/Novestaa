@@ -168,7 +168,7 @@ export const siteConfig = {
         lng: 75.5626,
       },
       googleMapsDirectUrl:
-        'https://www.google.com/maps/search/?api=1&query=Jalgaon%2C+Maharashtra+424201',
+        'https://www.google.com/maps/search/?api=1&query=Jalgaon%2C+Maharashtra%2C+India',
     },
     businessHours: 'Mon – Sat · 9:30 AM – 7:30 PM IST',
   },

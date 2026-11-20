@@ -49,10 +49,7 @@ export default defineConfig(() => {
     },
     define: {
       'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(
-        process.env.VITE_GOOGLE_MAPS_API_KEY ||
-          process.env.GOOGLE_MAPS_API_KEY ||
-          process.env.API_KEY ||
-          ''
+        process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || ''
       ),
     },
     server: {

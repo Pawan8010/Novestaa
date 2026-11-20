@@ -950,9 +950,21 @@ async function startServer() {
     next();
   });
 
+  const getRazorpayKeyId = (): string =>
+    process.env.RAZORPAY_KEY_ID?.trim() || process.env.VITE_RAZORPAY_KEY_ID?.trim() || '';
+
+  const getRazorpayKeySecret = (): string =>
+    process.env.RAZORPAY_KEY_SECRET?.trim() || process.env.RAZORPAY_SECRET?.trim() || '';
+
+  const getRazorpayWebhookSecret = (): string =>
+    process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || '';
+
+  const getGoogleMapsPublicKey = (): string =>
+    process.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
+
   const getRazorpayMode = (): 'live' | 'test' | 'unconfigured' => {
-    const keyId = process.env.RAZORPAY_KEY_ID?.trim() || '';
-    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || '';
+    const keyId = getRazorpayKeyId();
+    const keySecret = getRazorpayKeySecret();
     if (!keyId || !keySecret) return 'unconfigured';
     if (keyId.startsWith('rzp_live_')) return 'live';
     return 'test';
@@ -962,14 +974,12 @@ async function startServer() {
     const razorpayMode = getRazorpayMode();
     const smtpActive = isSmtpConfigured();
     const resendActive = Boolean(process.env.RESEND_API_KEY?.trim());
-    const webhookSecretConfigured = Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim());
+    const webhookSecretConfigured = Boolean(getRazorpayWebhookSecret());
     const founderPasskeyConfigured = Boolean(process.env.FOUNDER_ADMIN_KEY?.trim());
     const sessionSecretExplicit = Boolean(
       process.env.SESSION_SECRET?.trim() && process.env.SESSION_SECRET.trim().length >= 32
     );
-    const mapsKeyConfigured = Boolean(
-      process.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim()
-    );
+    const mapsKeyConfigured = Boolean(getGoogleMapsPublicKey());
     const distBuilt = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
     const appUrlIsHttps = /^https:\/\//i.test(baseUrl);
 
@@ -1055,9 +1065,27 @@ async function startServer() {
       emailTransport: mailTransport,
       razorpayConfigured: mode !== 'unconfigured',
       razorpayMode: mode,
-      webhookSecretConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim()),
+      webhookSecretConfigured: Boolean(getRazorpayWebhookSecret()),
+      mapsKeyConfigured: Boolean(getGoogleMapsPublicKey()),
       storageBackend: isUpstashConfigured() ? 'upstash-redis' : 'local-disk',
       totalAcceptedRequests: store.contacts.length + store.applications.length,
+    });
+  });
+
+  // Public runtime config (non-secret browser flags + referrer-restricted public Maps key)
+  app.get('/api/public-config', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      googleMapsApiKey: getGoogleMapsPublicKey(),
+      razorpayEnabled: getRazorpayMode() !== 'unconfigured',
+      razorpayMode: getRazorpayMode(),
+      location: {
+        city: 'Jalgaon',
+        state: 'Maharashtra',
+        country: 'India',
+        lat: 21.0077,
+        lng: 75.5626,
+      },
     });
   });
 
@@ -1670,22 +1698,25 @@ async function startServer() {
    * Razorpay Online Payments & Signed Webhook Integration
    */
   app.get('/api/payments/config', (_req, res) => {
-    const keyId = process.env.RAZORPAY_KEY_ID?.trim() || '';
-    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || '';
+    const keyId = getRazorpayKeyId();
+    const keySecret = getRazorpayKeySecret();
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       enabled: Boolean(keyId && keySecret),
+      mode: getRazorpayMode(),
       currency: 'INR',
       plans: Object.values(AUTHORITATIVE_PLANS),
     });
   });
 
   app.post(['/api/payments/create-order', '/api/payments/razorpay/order'], async (req, res) => {
-    const keyId = process.env.RAZORPAY_KEY_ID?.trim();
-    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    const keyId = getRazorpayKeyId();
+    const keySecret = getRazorpayKeySecret();
     if (!keyId || !keySecret) {
       res.status(503).json({
-        error: 'Online checkout is temporarily unavailable. Please use WhatsApp or the consultation form.',
+        error:
+          'Razorpay keys (RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET) are not configured in this server environment yet. Add them in your hosting Environment Variables or complete your order via WhatsApp below.',
+        code: 'RAZORPAY_NOT_CONFIGURED',
       });
       return;
     }
@@ -1799,7 +1830,7 @@ async function startServer() {
   });
 
   app.post(['/api/payments/verify', '/api/payments/razorpay/verify'], async (req, res) => {
-    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    const keySecret = getRazorpayKeySecret();
     if (!keySecret) {
       res.status(503).json({ error: 'Payment verification unavailable.' });
       return;

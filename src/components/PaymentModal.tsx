@@ -387,10 +387,23 @@ export function PaymentModal({ plan, onClose }: PaymentModalProps) {
             {error && (
               <div
                 role="alert"
-                className="flex items-start gap-2.5 rounded-[var(--radius-xs)] border border-[var(--color-error)] bg-[var(--color-bg-subtle)] p-3 text-[13px] text-[var(--color-error)]"
+                className="space-y-3 rounded-[var(--radius-xs)] border border-[var(--color-error)] bg-[var(--color-bg-subtle)] p-3.5 text-[13px] text-[var(--color-error)]"
               >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>{error}</span>
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{error}</span>
+                </div>
+                <a
+                  href={`${siteConfig.contact.whatsappUrl}?text=${encodeURIComponent(
+                    `Hi Novesta, I want to purchase ${plan.name} (${formattedAmount} ${plan.billing}). Name: ${name || 'Not entered'}, Business: ${businessName || 'Not entered'}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="resend-btn-secondary inline-flex min-h-[38px] items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium text-[var(--color-ink)]"
+                >
+                  <MessageCircle className="h-4 w-4 text-[#00a3ff]" aria-hidden="true" />
+                  <span>Complete Order on WhatsApp</span>
+                </a>
               </div>
             )}
 
