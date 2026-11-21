@@ -2054,6 +2054,14 @@ async function startServer() {
       .send('google-site-verification: google1e529b83336dbecf.html');
   });
 
+  // Google AdSense ads.txt publisher verification endpoint
+  app.get('/ads.txt', (_req, res) => {
+    res
+      .type('text/plain; charset=utf-8')
+      .setHeader('Cache-Control', 'public, max-age=3600')
+      .send('google.com, pub-4698892959376775, DIRECT, f08c47fec0942fa0\n');
+  });
+
   // Dynamic robots.txt & sitemap.xml using APP_URL or live request origin
   app.get('/robots.txt', (req, res) => {
     const baseUrl = resolveBaseUrl(req);
