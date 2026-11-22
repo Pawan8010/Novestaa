@@ -193,8 +193,8 @@ export const siteConfig = {
     },
     {
       name: 'LinkedIn',
-      url: 'https://www.linkedin.com/in/pawanrajput8010',
-      handle: 'pawanrajput8010',
+      url: 'https://www.linkedin.com/company/144155173/',
+      handle: 'Novesta',
       isPlaceholder: false,
     },
   ],
