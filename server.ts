@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
 import express from 'express';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,29 +17,10 @@ const DATA_DIR = process.env.DATA_DIR?.trim()
   ? path.resolve(process.env.DATA_DIR.trim())
   : path.resolve(__dirname, 'data');
 const SUBMISSIONS_FILE = path.join(DATA_DIR, 'submissions.json');
-const AUTH_SECRET_FILE = path.join(DATA_DIR, 'auth-secret.txt');
-
-const DEFAULT_FOUNDER_EMAILS = [
-  'rajputpawan9765@gmail.com',
-  'hello@novesta.online',
-  'novesta111@gmail.com',
-  'rajputpavan168@gmail.com',
-  'rajputpawan168@gmail.com',
-];
-
-function getAllowedFounderEmails(): string[] {
-  const custom = process.env.FOUNDER_EMAILS?.split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  if (custom && custom.length > 0) {
-    return Array.from(new Set([...custom, 'rajputpawan9765@gmail.com']));
-  }
-  return DEFAULT_FOUNDER_EMAILS;
-}
 
 function getBusinessAlertRecipients(): string[] {
   const primary = process.env.CONTACT_TO_EMAIL?.trim() || 'hello@novesta.online';
-  const backup = process.env.FOUNDER_BACKUP_EMAIL?.trim() || '';
+  const backup = process.env.CONTACT_BACKUP_EMAIL?.trim() || '';
   return Array.from(
     new Set(
       [primary, backup]
@@ -48,26 +28,6 @@ function getBusinessAlertRecipients(): string[] {
         .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
     )
   );
-}
-
-function getSessionSecret(): string {
-  if (process.env.SESSION_SECRET?.trim()) {
-    return process.env.SESSION_SECRET.trim();
-  }
-  try {
-    if (fs.existsSync(AUTH_SECRET_FILE)) {
-      const existing = fs.readFileSync(AUTH_SECRET_FILE, 'utf8').trim();
-      if (existing.length >= 32) return existing;
-    }
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const generated = crypto.randomBytes(32).toString('hex');
-    fs.writeFileSync(AUTH_SECRET_FILE, generated, 'utf8');
-    return generated;
-  } catch {
-    return crypto.randomBytes(32).toString('hex');
-  }
 }
 
 interface CareerRoleRecord {
@@ -103,115 +63,11 @@ interface CareerApplicationRecord {
   submittedAt: string;
 }
 
-interface FeedbackEntry {
-  id: string;
-  name: string;
-  business: string;
-  rating: number;
-  comment: string;
-  createdAt: string;
-  isSample?: boolean;
-}
-
-interface PaymentRecord {
-  id: string;
-  orderId: string;
-  paymentId?: string;
-  planId: string;
-  planName: string;
-  billing?: string;
-  services?: string[];
-  amountInr: number;
-  amountPaise: number;
-  currency: 'INR';
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
-  businessName: string;
-  status: 'Created' | 'Paid (Verified)' | 'Captured (Webhook)' | 'Failed';
-  webhookVerified?: boolean;
-  webhookEvent?: string;
-  customerEmailSent?: boolean;
-  adminEmailSent?: boolean;
-  confirmationEmailsSentAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface SubmissionsStore {
   contacts: ContactRecord[];
   applications: CareerApplicationRecord[];
   roles: CareerRoleRecord[];
-  payments: PaymentRecord[];
-  feedbacks: FeedbackEntry[];
 }
-
-const AUTHORITATIVE_PLANS: Record<
-  string,
-  { id: string; name: string; billing: string; amountInr: number; features: string[] }
-> = {
-  'large-business-all-services': {
-    id: 'large-business-all-services',
-    name: 'Large Business · All Services',
-    billing: 'for 2 years',
-    amountInr: 30000,
-    features: [
-      'Website & custom web app built free',
-      'Full SEO, Google ranking & Google Maps dominance',
-      'Social media marketing (Instagram, Facebook, X)',
-      'Zomato, Swiggy, Booking.com, MakeMyTrip, JustDial sync',
-      'AI chatbot, WhatsApp automation & analytics dashboard',
-      'Dedicated 2-year support & business scaling',
-    ],
-  },
-  'medium-business-full-growth': {
-    id: 'medium-business-full-growth',
-    name: 'Medium Business · All Services & CRM',
-    billing: 'for 2 years',
-    amountInr: 17000,
-    features: [
-      'Website + direct ordering or booking product included',
-      'Customer management & automated WhatsApp follow-ups',
-      'SEO, Google Maps & Business Profile optimization',
-      'Social media growth & local directory alignment',
-      '2-year complete business & customer operations support',
-    ],
-  },
-  'small-business-service-2yr': {
-    id: 'small-business-service-2yr',
-    name: 'Small Business · Services & Support',
-    billing: 'for 2 years',
-    amountInr: 7000,
-    features: [
-      'Fast mobile-first business website included',
-      'Google Maps & Business Profile setup',
-      'Essential local SEO & WhatsApp inquiry capture',
-      '2-year priority technical support & content updates',
-    ],
-  },
-  'medium-business-website': {
-    id: 'medium-business-website',
-    name: 'Medium Business · Website Only',
-    billing: 'one-time',
-    amountInr: 10000,
-    features: [
-      'Multi-page mobile-first responsive architecture',
-      'Product catalog, menu, or booking inquiry flow',
-      'Technical SEO, Schema markup & Google Map embed',
-    ],
-  },
-  'small-business-website': {
-    id: 'small-business-website',
-    name: 'Small Business · Website Only',
-    billing: 'one-time',
-    amountInr: 5000,
-    features: [
-      'Clean mobile-first responsive business website',
-      'SEO-ready setup & fast page loading',
-      'Contact form, WhatsApp button & Google Map',
-    ],
-  },
-};
 
 const DEFAULT_CAREER_ROLES: CareerRoleRecord[] = [
   {
@@ -251,8 +107,6 @@ function loadStore(): SubmissionsStore {
           Array.isArray(parsed.roles) && parsed.roles.length > 0
             ? parsed.roles
             : [...DEFAULT_CAREER_ROLES],
-        payments: Array.isArray(parsed.payments) ? parsed.payments : [],
-        feedbacks: Array.isArray(parsed.feedbacks) ? parsed.feedbacks : [],
       };
     }
   } catch (err) {
@@ -262,8 +116,6 @@ function loadStore(): SubmissionsStore {
     contacts: [],
     applications: [],
     roles: [...DEFAULT_CAREER_ROLES],
-    payments: [],
-    feedbacks: [],
   };
 }
 
@@ -291,8 +143,6 @@ async function hydrateStoreFromCloud(store: SubmissionsStore): Promise<void> {
     if (Array.isArray(parsed.contacts)) store.contacts = parsed.contacts;
     if (Array.isArray(parsed.applications)) store.applications = parsed.applications;
     if (Array.isArray(parsed.roles)) store.roles = parsed.roles;
-    if (Array.isArray(parsed.payments)) store.payments = parsed.payments;
-    if (Array.isArray(parsed.feedbacks)) store.feedbacks = parsed.feedbacks;
     console.info('[Novesta Storage] Hydrated shared store from Upstash Redis.');
   } catch (err) {
     console.warn('[Novesta Storage] Could not hydrate from Upstash Redis:', err);
@@ -329,15 +179,6 @@ function saveStore(store: SubmissionsStore): void {
     console.warn('Could not persist submissions store to disk:', err);
   }
   syncStoreToCloud(serialized);
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function getSmtpConfig() {
@@ -383,7 +224,7 @@ interface EmailSendResult {
 async function sendSmtpEmail(params: EmailSendParams): Promise<EmailSendResult> {
   const smtp = getSmtpConfig();
   if (!smtp.host || !smtp.user || !smtp.pass) {
-    return { ok: false, error: 'Hostinger SMTP credentials not configured' };
+    return { ok: false, error: 'SMTP credentials not configured' };
   }
 
   const label = params.fromLabel || 'Novesta';
@@ -438,7 +279,7 @@ async function sendResendEmail(params: EmailSendParams): Promise<EmailSendResult
   const fallbackFrom = `${label} <onboarding@resend.dev>`;
   const preferredFrom = process.env.RESEND_FROM_EMAIL?.trim() || fallbackFrom;
   const backupEmail =
-    process.env.FOUNDER_BACKUP_EMAIL?.trim() || 'novesta111@gmail.com';
+    process.env.CONTACT_BACKUP_EMAIL?.trim() || 'novesta111@gmail.com';
 
   const attemptSend = async (
     fromAddress: string,
@@ -553,7 +394,7 @@ async function sendTransactionalEmail(params: EmailSendParams): Promise<EmailSen
     if (smtpResult.ok) {
       return smtpResult;
     }
-    console.warn('Hostinger SMTP failed, checking Resend fallback:', smtpResult.error);
+    console.warn('SMTP failed, checking Resend fallback:', smtpResult.error);
     if (process.env.RESEND_API_KEY?.trim()) {
       const resendResult = await sendResendEmail(params);
       if (resendResult.ok) return resendResult;
@@ -571,208 +412,6 @@ async function sendTransactionalEmail(params: EmailSendParams): Promise<EmailSen
   }
 
   return { ok: false, error: 'No email transport configured (SMTP or RESEND_API_KEY)' };
-}
-
-function buildPaymentHtml(params: {
-  eyebrow: string;
-  headline: string;
-  intro: string;
-  servicesHeading: string;
-  services: string[];
-  metaRows: Array<[string, string]>;
-  footerNote: string;
-}): string {
-  const rowsHtml = params.metaRows
-    .map(
-      ([label, value]) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #e6e7ea;color:#5a606d;font-size:13px;">${escapeHtml(label)}</td><td style="padding:8px 0;border-bottom:1px solid #e6e7ea;color:#111317;font-size:13px;font-weight:600;text-align:right;">${escapeHtml(value)}</td></tr>`
-    )
-    .join('');
-
-  const servicesHtml = params.services
-    .map(
-      (svc) =>
-        `<li style="margin:6px 0;color:#111317;font-size:14px;line-height:1.5;">&#10003;&nbsp; ${escapeHtml(svc)}</li>`
-    )
-    .join('');
-
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:24px;background:#f5f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111317;">
-    <div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e4e9;border-radius:14px;overflow:hidden;">
-      <div style="background:#111317;color:#ffffff;padding:24px 28px;">
-        <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#a0a5b1;">${escapeHtml(params.eyebrow)}</p>
-        <h1 style="margin:0;font-size:22px;font-weight:600;">${escapeHtml(params.headline)}</h1>
-      </div>
-      <div style="padding:24px 28px;">
-        <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#323640;">${escapeHtml(params.intro)}</p>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:22px;">${rowsHtml}</table>
-        <div style="background:#f8f9fb;border:1px solid #e2e4e9;border-radius:10px;padding:16px 20px;margin-bottom:20px;">
-          <p style="margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#5a606d;">${escapeHtml(params.servicesHeading)}</p>
-          <ul style="margin:0;padding:0;list-style:none;">${servicesHtml}</ul>
-        </div>
-        <p style="margin:0;font-size:13px;line-height:1.6;color:#5a606d;">${escapeHtml(params.footerNote)}</p>
-      </div>
-    </div>
-  </body>
-</html>`;
-}
-
-const paymentEmailLocks = new Set<string>();
-
-async function sendPaymentConfirmationEmails(
-  record: PaymentRecord,
-  store: SubmissionsStore
-): Promise<{ alreadySent?: boolean; customerEmailSent: boolean; adminEmailSent: boolean }> {
-  if (record.confirmationEmailsSentAt || paymentEmailLocks.has(record.orderId)) {
-    return {
-      alreadySent: true,
-      customerEmailSent: Boolean(record.customerEmailSent),
-      adminEmailSent: Boolean(record.adminEmailSent),
-    };
-  }
-  paymentEmailLocks.add(record.orderId);
-  try {
-
-  const planInfo = AUTHORITATIVE_PLANS[record.planId];
-  const billing = record.billing || planInfo?.billing || 'standard plan';
-  const services =
-    record.services && record.services.length > 0
-      ? record.services
-      : planInfo?.features || [
-          'Dedicated Novesta digital growth onboarding & setup',
-          'Direct WhatsApp & priority support',
-        ];
-  record.billing = billing;
-  record.services = services;
-
-  const businessEmail = process.env.CONTACT_TO_EMAIL?.trim() || 'hello@novesta.online';
-  const amountText = `₹${record.amountInr.toLocaleString('en-IN')}`;
-  const serviceBulletLines = services.map((s) => `  • ${s}`).join('\n');
-
-  let customerEmailSent = false;
-  if (record.customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(record.customerEmail)) {
-    const customerText = [
-      `Hi ${record.customerName},`,
-      ``,
-      `Thank you for your payment! Your order with Novesta is confirmed.`,
-      ``,
-      `PAYMENT SUMMARY`,
-      `  Receipt ID: ${record.id}`,
-      `  Plan: ${record.planName} (${billing})`,
-      `  Amount Paid: ${amountText} INR`,
-      `  Order ID: ${record.orderId}`,
-      ...(record.paymentId ? [`  Payment ID: ${record.paymentId}`] : []),
-      `  Business: ${record.businessName}`,
-      ``,
-      `SERVICES YOU WILL RECEIVE`,
-      serviceBulletLines,
-      ``,
-      `NEXT STEPS`,
-      `Our onboarding team will contact you on WhatsApp (${record.customerPhone}) and email within 1 business day to collect your brand details and begin setup.`,
-      ``,
-      `Questions anytime? Reply directly to this email (${businessEmail}) or message +91 8010927311.`,
-      ``,
-      `— Team Novesta (novesta.online)`,
-    ].join('\n');
-
-    const customerHtml = buildPaymentHtml({
-      eyebrow: 'NOVESTA PAYMENT RECEIPT',
-      headline: `Payment Confirmed — ${amountText}`,
-      intro: `Hi ${record.customerName}, thank you for choosing Novesta. Your payment has been verified and onboarding for ${record.businessName} starts right away.`,
-      servicesHeading: 'Services You Will Receive',
-      services,
-      metaRows: [
-        ['Receipt ID', record.id],
-        ['Plan Purchased', `${record.planName} (${billing})`],
-        ['Amount Paid', `${amountText} INR`],
-        ['Razorpay Order ID', record.orderId],
-        ...(record.paymentId ? ([['Razorpay Payment ID', record.paymentId]] as [string, string][]) : []),
-        ['Registered Phone', record.customerPhone || 'Not provided'],
-      ],
-      footerNote: `Need immediate assistance? Reply to ${businessEmail} or WhatsApp +91 8010927311 with Receipt ${record.id}.`,
-    });
-
-    const customerRes = await sendTransactionalEmail({
-      to: [record.customerEmail],
-      replyTo: businessEmail,
-      fromLabel: 'Novesta Billing',
-      subject: `[Novesta] Payment Confirmed — ${record.planName} (Receipt ${record.id})`,
-      text: customerText,
-      html: customerHtml,
-    });
-    customerEmailSent = customerRes.ok;
-    if (!customerRes.ok) {
-      console.warn('Could not email customer payment confirmation:', customerRes.error);
-    }
-  }
-
-  const adminText = [
-    `New Razorpay Payment Confirmed on Novesta`,
-    ``,
-    `CUSTOMER DETAILS`,
-    `  Name: ${record.customerName}`,
-    `  Business: ${record.businessName}`,
-    `  Email: ${record.customerEmail || 'Not provided'}`,
-    `  Phone / WhatsApp: ${record.customerPhone || 'Not provided'}`,
-    ``,
-    `PAYMENT DETAILS`,
-    `  Receipt ID: ${record.id}`,
-    `  Plan: ${record.planName} (${billing})`,
-    `  Amount Paid: ${amountText} INR`,
-    `  Order ID: ${record.orderId}`,
-    ...(record.paymentId ? [`  Payment ID: ${record.paymentId}`] : []),
-    `  Status: ${record.status}`,
-    `  Customer Email Sent: ${customerEmailSent ? 'Yes' : 'No (check SMTP/Resend logs)'}`,
-    ``,
-    `SERVICES INCLUDED TO DELIVER`,
-    serviceBulletLines,
-  ].join('\n');
-
-  const adminHtml = buildPaymentHtml({
-    eyebrow: 'NOVESTA REVENUE ALERT',
-    headline: `Received ${amountText} — ${record.customerName}`,
-    intro: `${record.customerName} (${record.businessName}) completed online payment for ${record.planName}. Deliver the onboarding & service checklist below:`,
-    servicesHeading: 'Services To Deliver For This Plan',
-    services,
-    metaRows: [
-      ['Customer', `${record.customerName} (${record.businessName})`],
-      ['Customer Email', record.customerEmail || 'Not provided'],
-      ['Phone / WhatsApp', record.customerPhone || 'Not provided'],
-      ['Receipt ID', record.id],
-      ['Plan & Billing', `${record.planName} (${billing})`],
-      ['Amount Paid', `${amountText} INR`],
-      ['Order ID', record.orderId],
-      ...(record.paymentId ? ([['Payment ID', record.paymentId]] as [string, string][]) : []),
-      ['Customer Confirmation Sent', customerEmailSent ? 'Yes' : 'Not sent / fallback'],
-    ],
-    footerNote: `Reply directly to this email to message ${record.customerEmail || 'the customer'}.`,
-  });
-
-  const adminRes = await sendTransactionalEmail({
-    to: getBusinessAlertRecipients(),
-    replyTo: record.customerEmail || undefined,
-    fromLabel: 'Novesta Payments',
-    subject: `[Novesta Payment Received] ${amountText} — ${record.planName} (${record.customerName})`,
-    text: adminText,
-    html: adminHtml,
-  });
-  const adminEmailSent = adminRes.ok;
-  if (!adminRes.ok) {
-    console.warn('Could not email Novesta payment notification:', adminRes.error);
-  }
-
-  record.customerEmailSent = customerEmailSent;
-  record.adminEmailSent = adminEmailSent;
-  if (customerEmailSent || adminEmailSent) {
-    record.confirmationEmailsSentAt = new Date().toISOString();
-  }
-  saveStore(store);
-
-  return { customerEmailSent, adminEmailSent };
-  } finally {
-    paymentEmailLocks.delete(record.orderId);
-  }
 }
 
 interface ContactPayload {
@@ -800,7 +439,9 @@ function validateContactPayload(body: ContactPayload): {
   const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   const businessType =
-    typeof body.businessType === 'string' ? body.businessType.trim() : '';
+    typeof body.businessType === 'string' && body.businessType.trim()
+      ? body.businessType.trim().slice(0, 80)
+      : 'General';
   const plan = typeof body.plan === 'string' ? body.plan.trim().slice(0, 80) : '';
   const message = typeof body.message === 'string' ? body.message.trim() : '';
 
@@ -808,17 +449,15 @@ function validateContactPayload(body: ContactPayload): {
     return { valid: false, error: 'Please provide your full name (2–120 characters).' };
   }
 
-  const cleanPhone = phone.replace(/[\s\-()]/g, '');
-  if (!/^\+?[0-9]{8,15}$/.test(cleanPhone)) {
-    return { valid: false, error: 'Please provide a valid phone or WhatsApp number.' };
+  if (phone) {
+    const cleanPhone = phone.replace(/[\s\-()]/g, '');
+    if (!/^\+?[0-9]{8,15}$/.test(cleanPhone)) {
+      return { valid: false, error: 'Please provide a valid phone or WhatsApp number.' };
+    }
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 160) {
     return { valid: false, error: 'Please provide a valid email address.' };
-  }
-
-  if (!businessType || businessType.length > 80) {
-    return { valid: false, error: 'Please select a business type.' };
   }
 
   if (message.length < 3 || message.length > 2500) {
@@ -831,75 +470,45 @@ function validateContactPayload(body: ContactPayload): {
   };
 }
 
-const FOUNDER_COOKIE_NAME = 'novesta_founder_session';
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+const ACTIVE_APP_ROUTES = new Set<string>([
+  '/',
+  '/upsc-photo-signature-resizer',
+  '/ssc-photo-resizer',
+  '/ibps-photo-signature-resizer',
+  '/passport-photo-maker',
+  '/compress-pdf',
+  '/merge-pdf',
+  '/split-pdf',
+  '/about',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/careers',
+]);
 
-function parseCookies(cookieHeader: string | undefined): Record<string, string> {
-  const result: Record<string, string> = {};
-  if (!cookieHeader) return result;
-  for (const part of cookieHeader.split(';')) {
-    const idx = part.indexOf('=');
-    if (idx === -1) continue;
-    const key = part.slice(0, idx).trim();
-    const val = part.slice(idx + 1).trim();
-    try {
-      result[key] = decodeURIComponent(val);
-    } catch {
-      result[key] = val;
-    }
+function shouldRedirectToHome(reqPath: string): boolean {
+  const clean = reqPath.replace(/\/+$/, '') || '/';
+  if (ACTIVE_APP_ROUTES.has(clean)) return false;
+  if (
+    reqPath.startsWith('/api/') ||
+    reqPath.startsWith('/assets/') ||
+    reqPath.startsWith('/@') ||
+    reqPath.startsWith('/src/') ||
+    reqPath.startsWith('/node_modules/') ||
+    reqPath.startsWith('/__')
+  ) {
+    return false;
   }
-  return result;
-}
-
-function signSessionToken(email: string, secret: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({ email, exp: Date.now() + SESSION_TTL_MS }),
-    'utf8'
-  ).toString('base64url');
-  const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
-  return `${payload}.${sig}`;
-}
-
-function verifySessionToken(
-  token: string | undefined,
-  secret: string
-): { valid: boolean; email?: string } {
-  if (!token) return { valid: false };
-  const parts = token.split('.');
-  if (parts.length !== 2) return { valid: false };
-  const [payload, sig] = parts;
-  const expectedSig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
-  const sigBuf = Buffer.from(sig);
-  const expectedBuf = Buffer.from(expectedSig);
-  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
-    return { valid: false };
-  }
-  try {
-    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (typeof parsed.email !== 'string' || typeof parsed.exp !== 'number') {
-      return { valid: false };
-    }
-    if (Date.now() > parsed.exp) {
-      return { valid: false };
-    }
-    return { valid: true, email: parsed.email };
-  } catch {
-    return { valid: false };
-  }
+  // Do not redirect static file requests with extensions (e.g. /favicon.ico, /ads.txt, /robots.txt)
+  if (path.extname(reqPath)) return false;
+  return true;
 }
 
 async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
-  app.use(
-    express.json({
-      limit: '128kb',
-      verify: (req, _res, buf) => {
-        (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
-      },
-    })
-  );
+  app.use(express.json({ limit: '128kb' }));
 
   const resolveBaseUrl = (req: express.Request): string => {
     const envUrl = process.env.APP_URL?.trim();
@@ -940,8 +549,8 @@ async function startServer() {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Razorpay-Signature');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
       if (req.method === 'OPTIONS') {
         res.status(204).end();
         return;
@@ -950,109 +559,11 @@ async function startServer() {
     next();
   });
 
-  const getRazorpayKeyId = (): string =>
-    process.env.RAZORPAY_KEY_ID?.trim() || process.env.VITE_RAZORPAY_KEY_ID?.trim() || '';
-
-  const getRazorpayKeySecret = (): string =>
-    process.env.RAZORPAY_KEY_SECRET?.trim() || process.env.RAZORPAY_SECRET?.trim() || '';
-
-  const getRazorpayWebhookSecret = (): string =>
-    process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || '';
-
-  const getGoogleMapsPublicKey = (): string =>
-    process.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
-
-  const getRazorpayMode = (): 'live' | 'test' | 'unconfigured' => {
-    const keyId = getRazorpayKeyId();
-    const keySecret = getRazorpayKeySecret();
-    if (!keyId || !keySecret) return 'unconfigured';
-    if (keyId.startsWith('rzp_live_')) return 'live';
-    return 'test';
-  };
-
-  const getProductionReadiness = (baseUrl: string) => {
-    const razorpayMode = getRazorpayMode();
-    const smtpActive = isSmtpConfigured();
-    const resendActive = Boolean(process.env.RESEND_API_KEY?.trim());
-    const webhookSecretConfigured = Boolean(getRazorpayWebhookSecret());
-    const founderPasskeyConfigured = Boolean(process.env.FOUNDER_ADMIN_KEY?.trim());
-    const sessionSecretExplicit = Boolean(
-      process.env.SESSION_SECRET?.trim() && process.env.SESSION_SECRET.trim().length >= 32
-    );
-    const mapsKeyConfigured = Boolean(getGoogleMapsPublicKey());
-    const distBuilt = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
-    const appUrlIsHttps = /^https:\/\//i.test(baseUrl);
-
-    return {
-      nodeEnv: process.env.NODE_ENV?.trim() || 'development',
-      appUrl: baseUrl,
-      appUrlIsHttps,
-      smtpConfigured: smtpActive,
-      resendConfigured: resendActive,
-      emailTransport: getEmailTransportMode(),
-      razorpayMode,
-      razorpayWebhookSecretConfigured: webhookSecretConfigured,
-      founderPasskeyConfigured,
-      sessionSecretExplicit,
-      mapsKeyConfigured,
-      distBuilt,
-      readyForLiveTraffic: Boolean(
-        smtpActive &&
-          razorpayMode === 'live' &&
-          webhookSecretConfigured &&
-          founderPasskeyConfigured &&
-          appUrlIsHttps
-      ),
-    };
-  };
-
   const store = loadStore();
   await hydrateStoreFromCloud(store);
-  const sessionSecret = getSessionSecret();
-  const otpChallenges = new Map<
-    string,
-    { codeHash: string; expiresAt: number; attempts: number }
-  >();
 
-  const getAuthenticatedFounder = (req: express.Request): string | null => {
-    const authHeader = req.headers.authorization;
-    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-      const bearerToken = authHeader.slice(7).trim();
-      const verifiedBearer = verifySessionToken(bearerToken, sessionSecret);
-      if (verifiedBearer.valid && verifiedBearer.email) {
-        return verifiedBearer.email;
-      }
-    }
-    const cookies = parseCookies(req.headers.cookie);
-    const verified = verifySessionToken(cookies[FOUNDER_COOKIE_NAME], sessionSecret);
-    return verified.valid && verified.email ? verified.email : null;
-  };
-
-  const setFounderSessionCookie = (
-    req: express.Request,
-    res: express.Response,
-    email: string
-  ): string => {
-    const token = signSessionToken(email, sessionSecret);
-    const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol;
-    const isHttps = proto === 'https' || req.secure;
-    const cookieParts = [
-      `${FOUNDER_COOKIE_NAME}=${encodeURIComponent(token)}`,
-      'Path=/',
-      `Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`,
-      'HttpOnly',
-      isHttps ? 'SameSite=None' : 'SameSite=Lax',
-    ];
-    if (isHttps) {
-      cookieParts.push('Secure');
-    }
-    res.setHeader('Set-Cookie', cookieParts.join('; '));
-    return token;
-  };
-
-  // Health check endpoint (Render & production monitoring)
+  // Health check endpoint
   app.get('/api/health', (_req, res) => {
-    const mode = getRazorpayMode();
     const mailTransport = getEmailTransportMode();
     const environment = process.env.NODE_ENV?.trim() || 'development';
     res.setHeader('Cache-Control', 'no-store');
@@ -1060,36 +571,13 @@ async function startServer() {
       status: 'ok',
       service: 'novesta-web',
       environment,
-      env: environment,
       mailTransport,
-      emailTransport: mailTransport,
-      razorpayConfigured: mode !== 'unconfigured',
-      razorpayMode: mode,
-      webhookSecretConfigured: Boolean(getRazorpayWebhookSecret()),
-      mapsKeyConfigured: Boolean(getGoogleMapsPublicKey()),
       storageBackend: isUpstashConfigured() ? 'upstash-redis' : 'local-disk',
       totalAcceptedRequests: store.contacts.length + store.applications.length,
     });
   });
 
-  // Public runtime config (non-secret browser flags + referrer-restricted public Maps key)
-  app.get('/api/public-config', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({
-      googleMapsApiKey: getGoogleMapsPublicKey(),
-      razorpayEnabled: getRazorpayMode() !== 'unconfigured',
-      razorpayMode: getRazorpayMode(),
-      location: {
-        city: 'Jalgaon',
-        state: 'Maharashtra',
-        country: 'India',
-        lat: 21.0077,
-        lng: 75.5626,
-      },
-    });
-  });
-
-  // Live open roles + real-time application counts
+  // Live open roles + real-time application counts for /careers
   app.get('/api/careers/roles', (_req, res) => {
     const countsByRole = store.applications.reduce<Record<string, number>>((acc, item) => {
       acc[item.role] = (acc[item.role] || 0) + 1;
@@ -1106,935 +594,7 @@ async function startServer() {
     });
   });
 
-  // Founder Auth & Admin Endpoints (strictly founder-only)
-  app.get('/api/admin/session', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({
-      authenticated: Boolean(founderEmail),
-      email: founderEmail || undefined,
-      emailOtpEnabled: getEmailTransportMode() !== 'none',
-      passkeyEnabled: Boolean(process.env.FOUNDER_ADMIN_KEY?.trim()),
-    });
-  });
-
-  app.post('/api/admin/logout', (req, res) => {
-    const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol;
-    const isHttps = proto === 'https' || req.secure;
-    const clearParts = [
-      `${FOUNDER_COOKIE_NAME}=`,
-      'Path=/',
-      'Max-Age=0',
-      'HttpOnly',
-      isHttps ? 'SameSite=None' : 'SameSite=Lax',
-    ];
-    if (isHttps) clearParts.push('Secure');
-    res.setHeader('Set-Cookie', clearParts.join('; '));
-    res.json({ ok: true });
-  });
-
-  app.post('/api/admin/request-otp', async (req, res) => {
-    const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const allowedEmails = getAllowedFounderEmails();
-    if (!rawEmail || !allowedEmails.includes(rawEmail)) {
-      res.status(403).json({
-        error: 'Access restricted: only the Novesta founder email can request an admin code.',
-      });
-      return;
-    }
-
-    if (getEmailTransportMode() === 'none') {
-      res.status(503).json({
-        error: 'Email verification is unavailable without Hostinger SMTP or RESEND_API_KEY configured.',
-      });
-      return;
-    }
-
-    const code = String(crypto.randomInt(100000, 1000000));
-    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
-    otpChallenges.set(rawEmail, {
-      codeHash,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-      attempts: 0,
-    });
-
-    const result = await sendTransactionalEmail({
-      to: [rawEmail],
-      fromLabel: 'Novesta Security',
-      subject: `[Novesta Founder Login] Your verification code: ${code}`,
-      text: [
-        `Your Novesta Founder Admin verification code is: ${code}`,
-        ``,
-        `This code expires in 10 minutes. If you did not request this login, you can safely ignore this email.`,
-      ].join('\n'),
-    });
-
-    if (!result.ok) {
-      console.error('OTP delivery error:', result.error);
-      res.status(502).json({
-        error:
-          'Could not deliver verification email to that address right now. Sign in using your Founder Passkey instead.',
-      });
-      return;
-    }
-
-    res.json({
-      ok: true,
-      message: `Verification code sent to ${rawEmail}. Check your inbox and enter the 6-digit code.`,
-    });
-  });
-
-  app.post('/api/admin/verify-otp', (req, res) => {
-    const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\D/g, '') : '';
-
-    const challenge = otpChallenges.get(rawEmail);
-    if (!challenge || Date.now() > challenge.expiresAt) {
-      otpChallenges.delete(rawEmail);
-      res.status(401).json({ error: 'Code expired or invalid. Please request a new code.' });
-      return;
-    }
-
-    if (challenge.attempts >= 5) {
-      otpChallenges.delete(rawEmail);
-      res.status(429).json({ error: 'Too many failed attempts. Please request a new code.' });
-      return;
-    }
-
-    const inputHash = crypto.createHash('sha256').update(code).digest('hex');
-    const a = Buffer.from(inputHash);
-    const b = Buffer.from(challenge.codeHash);
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-      challenge.attempts += 1;
-      res.status(401).json({ error: 'Incorrect verification code. Please check your email.' });
-      return;
-    }
-
-    otpChallenges.delete(rawEmail);
-    const token = setFounderSessionCookie(req, res, rawEmail);
-    res.json({ ok: true, email: rawEmail, token });
-  });
-
-  app.post('/api/admin/login-key', (req, res) => {
-    const configuredKey = process.env.FOUNDER_ADMIN_KEY?.trim();
-    if (!configuredKey) {
-      res.status(403).json({
-        error: 'Founder passkey login is not configured in environment variables. Use Email Verification Code instead.',
-      });
-      return;
-    }
-
-    const submittedKey = typeof req.body?.passkey === 'string' ? req.body.passkey.trim() : '';
-    const expectedBuf = Buffer.from(configuredKey, 'utf8');
-    const providedBuf = Buffer.from(submittedKey, 'utf8');
-    if (
-      providedBuf.length !== expectedBuf.length ||
-      !crypto.timingSafeEqual(providedBuf, expectedBuf)
-    ) {
-      res.status(401).json({ error: 'Invalid founder passkey.' });
-      return;
-    }
-
-    const primaryEmail = getAllowedFounderEmails()[0] || 'hello@novesta.online';
-    const token = setFounderSessionCookie(req, res, primaryEmail);
-    res.json({ ok: true, email: primaryEmail, token });
-  });
-
-  app.get('/api/admin/submissions', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-
-    const baseUrl = resolveBaseUrl(req);
-    const resendFromEnv = process.env.RESEND_FROM_EMAIL?.trim() || '';
-    const smtp = getSmtpConfig();
-    const transportMode = getEmailTransportMode();
-    const smtpActive = isSmtpConfigured();
-
-    res.json({
-      roles: store.roles,
-      applications: store.applications,
-      contacts: store.contacts,
-      payments: store.payments,
-      feedbacks: store.feedbacks,
-      razorpaySetup: {
-        keyConfigured: Boolean(
-          process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim()
-        ),
-        webhookSecretConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim()),
-        webhookUrl: `${baseUrl}/api/payments/razorpay/webhook`,
-        recommendedEvents: ['payment.captured', 'order.paid', 'payment.failed'],
-      },
-      emailSetup: {
-        transport: transportMode,
-        smtpConfigured: smtpActive,
-        smtpHost: smtp.host || 'smtp.hostinger.com',
-        smtpPort: smtp.port,
-        smtpUser: smtp.user || 'hello@novesta.online',
-        resendKeyConfigured: Boolean(process.env.RESEND_API_KEY?.trim()),
-        fromAddress: smtpActive
-          ? smtp.from || `Novesta <${smtp.user}>`
-          : resendFromEnv || 'Novesta <onboarding@resend.dev>',
-        toAddress: process.env.CONTACT_TO_EMAIL?.trim() || 'hello@novesta.online',
-        backupEmail: process.env.FOUNDER_BACKUP_EMAIL?.trim() || 'novesta111@gmail.com',
-        customDomainConfigured: Boolean(
-          smtpActive || (resendFromEnv && !resendFromEnv.includes('onboarding@resend.dev'))
-        ),
-      },
-      productionReadiness: getProductionReadiness(baseUrl),
-    });
-  });
-
-  app.post('/api/admin/verify-smtp', async (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-
-    const smtp = getSmtpConfig();
-    if (!smtp.host || !smtp.user || !smtp.pass) {
-      res.status(400).json({
-        ok: false,
-        error:
-          'Hostinger SMTP credentials are incomplete on the server. Set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in .env.',
-      });
-      return;
-    }
-
-    try {
-      const transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.secure,
-        auth: {
-          user: smtp.user,
-          pass: smtp.pass,
-        },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 12000,
-      });
-
-      await transporter.verify();
-      res.json({
-        ok: true,
-        message: `Verified authenticated TLS/SMTP connection to ${smtp.host}:${smtp.port} as ${smtp.user}.`,
-      });
-    } catch (err) {
-      res.status(502).json({
-        ok: false,
-        error:
-          err instanceof Error
-            ? `SMTP handshake failed: ${err.message}`
-            : 'SMTP handshake failed.',
-      });
-    }
-  });
-
-  app.post('/api/admin/test-email', async (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-
-    const toAddress = process.env.CONTACT_TO_EMAIL?.trim() || 'hello@novesta.online';
-    const result = await sendTransactionalEmail({
-      to: [toAddress],
-      replyTo: founderEmail,
-      subject: 'Novesta Email & Domain Verification Test',
-      text: [
-        'Novesta transactional email diagnostic test.',
-        `Active Transport: ${getEmailTransportMode().toUpperCase()}`,
-        `Triggered by: ${founderEmail}`,
-        `Target Inbox: ${toAddress}`,
-        `Timestamp: ${new Date().toISOString()}`,
-      ].join('\n'),
-    });
-
-    if (!result.ok) {
-      res.status(502).json({
-        ok: false,
-        error: result.error || 'Email dispatch failed.',
-        status: result.status,
-      });
-      return;
-    }
-
-    const delivered = result.deliveredTo?.join(', ') || toAddress;
-    res.json({
-      ok: true,
-      transport: result.transport,
-      deliveredTo: result.deliveredTo || [toAddress],
-      usedFallback: Boolean(result.usedFallback),
-      message:
-        result.transport === 'smtp'
-          ? `Test email delivered directly via Hostinger SMTP (${getSmtpConfig().host}) to ${delivered}.`
-          : result.usedFallback
-            ? `Delivered via Resend fallback to ${delivered}. Configure Hostinger SMTP or verify novesta.online DNS in Resend for direct customer receipts.`
-            : `Test email delivered directly to ${delivered}.`,
-    });
-  });
-
-  app.post('/api/admin/roles', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-
-    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
-    const team = typeof req.body?.team === 'string' ? req.body.team.trim() : '';
-    const location = typeof req.body?.location === 'string' ? req.body.location.trim() : '';
-    const status =
-      typeof req.body?.status === 'string' && req.body.status.trim()
-        ? req.body.status.trim()
-        : 'Accepting applications';
-
-    if (title.length < 2 || title.length > 100) {
-      res.status(400).json({ error: 'Role title must be 2–100 characters.' });
-      return;
-    }
-    if (team.length < 2 || team.length > 80) {
-      res.status(400).json({ error: 'Team / department must be 2–80 characters.' });
-      return;
-    }
-    if (location.length < 2 || location.length > 80) {
-      res.status(400).json({ error: 'Location must be 2–80 characters.' });
-      return;
-    }
-
-    const nextNumber = store.roles.length + 1;
-    const code = String(nextNumber).padStart(2, '0');
-    const baseSlug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-      .slice(0, 40);
-    const id = `${baseSlug || 'role'}-${Date.now().toString(36)}`;
-
-    const newRole: CareerRoleRecord = {
-      id,
-      code,
-      title,
-      team,
-      location,
-      status: status.slice(0, 40),
-    };
-
-    store.roles.push(newRole);
-    saveStore(store);
-
-    res.status(201).json({ ok: true, role: newRole, roles: store.roles });
-  });
-
-  app.put('/api/admin/roles/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-
-    const roleId = req.params.id;
-    const target = store.roles.find((r) => r.id === roleId);
-    if (!target) {
-      res.status(404).json({ error: 'Role not found.' });
-      return;
-    }
-
-    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : target.title;
-    const team = typeof req.body?.team === 'string' ? req.body.team.trim() : target.team;
-    const location =
-      typeof req.body?.location === 'string' ? req.body.location.trim() : target.location;
-    const status = typeof req.body?.status === 'string' ? req.body.status.trim() : target.status;
-    const code =
-      typeof req.body?.code === 'string' && req.body.code.trim()
-        ? req.body.code.trim().slice(0, 6)
-        : target.code;
-
-    if (title.length < 2 || title.length > 100) {
-      res.status(400).json({ error: 'Role title must be 2–100 characters.' });
-      return;
-    }
-    if (team.length < 2 || team.length > 80) {
-      res.status(400).json({ error: 'Team / department must be 2–80 characters.' });
-      return;
-    }
-    if (location.length < 2 || location.length > 80) {
-      res.status(400).json({ error: 'Location must be 2–80 characters.' });
-      return;
-    }
-
-    target.code = code;
-    target.title = title;
-    target.team = team;
-    target.location = location;
-    target.status = status.slice(0, 40) || 'Accepting applications';
-    saveStore(store);
-
-    res.json({ ok: true, role: target, roles: store.roles });
-  });
-
-  app.delete('/api/admin/roles/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-
-    const roleId = req.params.id;
-    const before = store.roles.length;
-    store.roles = store.roles
-      .filter((r) => r.id !== roleId)
-      .map((r, index) => ({ ...r, code: String(index + 1).padStart(2, '0') }));
-
-    if (store.roles.length === before) {
-      res.status(404).json({ error: 'Role not found.' });
-      return;
-    }
-
-    saveStore(store);
-    res.json({ ok: true, roles: store.roles });
-  });
-
-  app.post('/api/admin/roles/reset', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-    store.roles = [...DEFAULT_CAREER_ROLES];
-    saveStore(store);
-    res.json({ ok: true, roles: store.roles });
-  });
-
-  app.delete('/api/admin/applications/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-    const appId = req.params.id;
-    const before = store.applications.length;
-    store.applications = store.applications.filter((a) => a.id !== appId);
-    if (store.applications.length === before) {
-      res.status(404).json({ error: 'Application not found.' });
-      return;
-    }
-    saveStore(store);
-    res.json({ ok: true, applications: store.applications });
-  });
-
-  app.delete('/api/admin/contacts/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-    const leadId = req.params.id;
-    const before = store.contacts.length;
-    store.contacts = store.contacts.filter((c) => c.id !== leadId);
-    if (store.contacts.length === before) {
-      res.status(404).json({ error: 'Consultation lead not found.' });
-      return;
-    }
-    saveStore(store);
-    res.json({ ok: true, contacts: store.contacts });
-  });
-
-  app.put('/api/admin/feedback/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-    const feedbackId = req.params.id;
-    const target = store.feedbacks.find((f) => f.id === feedbackId);
-    if (!target) {
-      res.status(404).json({ error: 'Feedback entry not found.' });
-      return;
-    }
-
-    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : target.name;
-    const business =
-      typeof req.body?.business === 'string' ? req.body.business.trim() : target.business;
-    const comment =
-      typeof req.body?.comment === 'string' ? req.body.comment.trim() : target.comment;
-    const ratingNum =
-      req.body?.rating !== undefined ? Number(req.body.rating) : target.rating;
-
-    if (name.length < 2 || name.length > 80) {
-      res.status(400).json({ error: 'Name must be 2–80 characters.' });
-      return;
-    }
-    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-      res.status(400).json({ error: 'Rating must be between 1 and 5.' });
-      return;
-    }
-    if (comment.length < 3 || comment.length > 600) {
-      res.status(400).json({ error: 'Comment must be 3–600 characters.' });
-      return;
-    }
-
-    target.name = name;
-    target.business = business.slice(0, 80) || 'Verified Client';
-    target.rating = ratingNum;
-    target.comment = comment;
-    saveStore(store);
-    res.json({ ok: true, item: target, feedbacks: store.feedbacks });
-  });
-
-  app.delete('/api/admin/feedback/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-    const feedbackId = req.params.id;
-    const before = store.feedbacks.length;
-    store.feedbacks = store.feedbacks.filter((f) => f.id !== feedbackId);
-    if (store.feedbacks.length === before) {
-      res.status(404).json({ error: 'Feedback entry not found.' });
-      return;
-    }
-    saveStore(store);
-    res.json({ ok: true, feedbacks: store.feedbacks });
-  });
-
-  app.delete('/api/admin/payments/:id', (req, res) => {
-    const founderEmail = getAuthenticatedFounder(req);
-    if (!founderEmail) {
-      res.status(401).json({ error: 'Founder authentication required.' });
-      return;
-    }
-    const paymentId = req.params.id;
-    const before = store.payments.length;
-    store.payments = store.payments.filter((p) => p.id !== paymentId);
-    if (store.payments.length === before) {
-      res.status(404).json({ error: 'Payment record not found.' });
-      return;
-    }
-    saveStore(store);
-    res.json({ ok: true, payments: store.payments });
-  });
-
-  // Public feedback endpoints (persisted in submissions store, displayed live on site, + emails founder)
-  app.get('/api/feedback', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    const items = store.feedbacks;
-    const totalCount = items.length;
-    const averageRating =
-      totalCount > 0
-        ? Number(
-            (items.reduce((sum, item) => sum + item.rating, 0) / totalCount).toFixed(1)
-          )
-        : 0;
-    res.json({ items, totalCount, averageRating });
-  });
-
-  app.post('/api/feedback', async (req, res) => {
-    const body = req.body || {};
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const business = typeof body.business === 'string' ? body.business.trim() : '';
-    const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
-    const ratingNum = Number(body.rating);
-
-    if (name.length < 2 || name.length > 80) {
-      res.status(400).json({ error: 'Please enter your name (2–80 characters).' });
-      return;
-    }
-    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-      res.status(400).json({ error: 'Please choose a rating between 1 and 5 stars.' });
-      return;
-    }
-    if (comment.length < 3 || comment.length > 600) {
-      res.status(400).json({ error: 'Please write feedback between 3 and 600 characters.' });
-      return;
-    }
-
-    const businessLabel = business.slice(0, 80) || 'Verified Client';
-    const entry: FeedbackEntry = {
-      id: `NOV-FB-${Date.now().toString(36).toUpperCase()}`,
-      name,
-      business: businessLabel,
-      rating: ratingNum,
-      comment,
-      createdAt: new Date().toISOString(),
-    };
-
-    store.feedbacks.unshift(entry);
-    if (store.feedbacks.length > 200) store.feedbacks.length = 200;
-    saveStore(store);
-
-    const emailResult = await sendTransactionalEmail({
-      to: getBusinessAlertRecipients(),
-      fromLabel: 'Novesta Feedback',
-      subject: `[Novesta Public Feedback] ${ratingNum}/5 from ${name}`,
-      text: [
-        `New public feedback published on Novesta (${entry.id})`,
-        ``,
-        `Name: ${name}`,
-        `Business / Role: ${businessLabel}`,
-        `Rating: ${ratingNum} / 5`,
-        ``,
-        `Feedback:`,
-        comment,
-      ].join('\n'),
-    });
-
-    res.status(200).json({
-      ok: true,
-      delivered: emailResult.ok,
-      item: entry,
-      items: store.feedbacks,
-      message: 'Thank you! Your feedback is now published on the website.',
-    });
-  });
-
-  /**
-   * Razorpay Online Payments & Signed Webhook Integration
-   */
-  app.get('/api/payments/config', (_req, res) => {
-    const keyId = getRazorpayKeyId();
-    const keySecret = getRazorpayKeySecret();
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({
-      enabled: Boolean(keyId && keySecret),
-      mode: getRazorpayMode(),
-      currency: 'INR',
-      plans: Object.values(AUTHORITATIVE_PLANS),
-    });
-  });
-
-  app.post(['/api/payments/create-order', '/api/payments/razorpay/order'], async (req, res) => {
-    const keyId = getRazorpayKeyId();
-    const keySecret = getRazorpayKeySecret();
-    if (!keyId || !keySecret) {
-      res.status(503).json({
-        error:
-          'Razorpay keys (RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET) are not configured in this server environment yet. Add them in your hosting Environment Variables or complete your order via WhatsApp below.',
-        code: 'RAZORPAY_NOT_CONFIGURED',
-      });
-      return;
-    }
-
-    const body = req.body || {};
-    const planId = typeof body.planId === 'string' ? body.planId.trim() : '';
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
-    const email = typeof body.email === 'string' ? body.email.trim() : '';
-    const businessName =
-      typeof body.businessName === 'string' ? body.businessName.trim().slice(0, 120) : '';
-
-    const plan = AUTHORITATIVE_PLANS[planId];
-    if (!plan) {
-      res.status(400).json({ error: 'Invalid pricing plan selected.' });
-      return;
-    }
-    if (name.length < 2 || name.length > 120) {
-      res.status(400).json({ error: 'Please enter your full name (2–120 characters).' });
-      return;
-    }
-    const cleanPhone = phone.replace(/[\s\-()]/g, '');
-    if (!/^\+?[0-9]{8,15}$/.test(cleanPhone)) {
-      res.status(400).json({ error: 'Please enter a valid 10-digit phone or WhatsApp number.' });
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 160) {
-      res.status(400).json({ error: 'Please enter a valid email address.' });
-      return;
-    }
-
-    const receipt = `NOV-${Date.now().toString(36).toUpperCase()}`;
-    const amountPaise = plan.amountInr * 100;
-    const authHeader = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`;
-
-    try {
-      const rpResponse = await fetch('https://api.razorpay.com/v1/orders', {
-        method: 'POST',
-        headers: {
-          Authorization: authHeader,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: amountPaise,
-          currency: 'INR',
-          receipt,
-          notes: {
-            planId: plan.id,
-            planName: plan.name,
-            customerName: name,
-            customerPhone: phone,
-            customerEmail: email,
-            businessName: businessName || 'Not specified',
-          },
-        }),
-      });
-
-      const rpData = (await rpResponse.json().catch(() => ({}))) as {
-        id?: string;
-        amount?: number;
-        currency?: string;
-        error?: { description?: string };
-      };
-
-      if (!rpResponse.ok || !rpData.id) {
-        console.error('Razorpay order error:', rpResponse.status, rpData);
-        res.status(502).json({
-          error: rpData.error?.description || 'Could not initialize Razorpay checkout order.',
-        });
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const paymentRecord: PaymentRecord = {
-        id: receipt,
-        orderId: rpData.id,
-        planId: plan.id,
-        planName: plan.name,
-        billing: plan.billing,
-        services: plan.features,
-        amountInr: plan.amountInr,
-        amountPaise,
-        currency: 'INR',
-        customerName: name,
-        customerPhone: phone,
-        customerEmail: email,
-        businessName: businessName || 'Not specified',
-        status: 'Created',
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      store.payments.unshift(paymentRecord);
-      if (store.payments.length > 200) store.payments.length = 200;
-      saveStore(store);
-
-      res.json({
-        ok: true,
-        keyId,
-        orderId: rpData.id,
-        amount: amountPaise,
-        amountInr: plan.amountInr,
-        currency: 'INR',
-        receipt,
-        plan,
-      });
-    } catch (err) {
-      console.error('Razorpay network error:', err);
-      res.status(500).json({ error: 'Network error connecting to Razorpay.' });
-    }
-  });
-
-  app.post(['/api/payments/verify', '/api/payments/razorpay/verify'], async (req, res) => {
-    const keySecret = getRazorpayKeySecret();
-    if (!keySecret) {
-      res.status(503).json({ error: 'Payment verification unavailable.' });
-      return;
-    }
-
-    const orderId =
-      typeof req.body?.razorpay_order_id === 'string' ? req.body.razorpay_order_id.trim() : '';
-    const paymentId =
-      typeof req.body?.razorpay_payment_id === 'string' ? req.body.razorpay_payment_id.trim() : '';
-    const signature =
-      typeof req.body?.razorpay_signature === 'string' ? req.body.razorpay_signature.trim() : '';
-
-    if (!orderId || !paymentId || !signature) {
-      res.status(400).json({ error: 'Incomplete payment verification payload.' });
-      return;
-    }
-
-    const expectedSignature = crypto
-      .createHmac('sha256', keySecret)
-      .update(`${orderId}|${paymentId}`)
-      .digest('hex');
-
-    const providedBuf = Buffer.from(signature, 'utf8');
-    const expectedBuf = Buffer.from(expectedSignature, 'utf8');
-    if (
-      providedBuf.length !== expectedBuf.length ||
-      !crypto.timingSafeEqual(providedBuf, expectedBuf)
-    ) {
-      res.status(400).json({ error: 'Payment signature verification failed.' });
-      return;
-    }
-
-    const record = store.payments.find((p) => p.orderId === orderId);
-    const now = new Date().toISOString();
-    let customerEmailSent = false;
-    let adminEmailSent = false;
-
-    if (record) {
-      record.paymentId = paymentId;
-      record.status = 'Paid (Verified)';
-      record.updatedAt = now;
-      saveStore(store);
-
-      const emailStatus = await sendPaymentConfirmationEmails(record, store);
-      customerEmailSent = emailStatus.customerEmailSent;
-      adminEmailSent = emailStatus.adminEmailSent;
-    }
-
-    const planInfo = record ? AUTHORITATIVE_PLANS[record.planId] : undefined;
-    const services =
-      record?.services && record.services.length > 0
-        ? record.services
-        : planInfo?.features || [];
-
-    res.json({
-      ok: true,
-      receipt: record?.id || orderId,
-      orderId,
-      paymentId,
-      planName: record?.planName || 'Novesta Plan',
-      billing: record?.billing || planInfo?.billing || '',
-      amountInr: record?.amountInr || 0,
-      customerEmail: record?.customerEmail || '',
-      customerEmailSent,
-      adminEmailSent,
-      services,
-      status: 'Paid (Verified)',
-      paidAt: now,
-    });
-  });
-
-  app.get(['/api/payments/razorpay/webhook', '/api/payments/webhook'], (_req, res) => {
-    res.json({
-      ok: true,
-      status: 'ready',
-      method: 'POST',
-      webhookSecretConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim()),
-      emailTransport: getEmailTransportMode(),
-      events: ['payment.captured', 'order.paid', 'payment.failed'],
-    });
-  });
-
-  app.post(['/api/payments/razorpay/webhook', '/api/payments/webhook'], async (req, res) => {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
-    const signature = (req.headers['x-razorpay-signature'] as string | undefined)?.trim() || '';
-    const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
-
-    if (isProduction && !webhookSecret) {
-      console.error('[Novesta Razorpay Webhook] Rejected unsigned webhook in production: RAZORPAY_WEBHOOK_SECRET not set.');
-      res.status(503).json({
-        error: 'Webhook signature verification secret is not configured on the server.',
-      });
-      return;
-    }
-
-    if (webhookSecret) {
-      if (!signature || !rawBody) {
-        res.status(401).json({ error: 'Missing webhook signature or payload.' });
-        return;
-      }
-      const expected = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(rawBody)
-        .digest('hex');
-      const sigBuf = Buffer.from(signature, 'utf8');
-      const expBuf = Buffer.from(expected, 'utf8');
-      if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-        res.status(401).json({ error: 'Invalid Razorpay webhook signature.' });
-        return;
-      }
-    }
-
-    const eventName = typeof req.body?.event === 'string' ? req.body.event : 'unknown';
-    const paymentEntity = req.body?.payload?.payment?.entity;
-    const orderEntity = req.body?.payload?.order?.entity;
-    const orderId =
-      (typeof paymentEntity?.order_id === 'string' && paymentEntity.order_id) ||
-      (typeof orderEntity?.id === 'string' && orderEntity.id) ||
-      '';
-    const paymentId = typeof paymentEntity?.id === 'string' ? paymentEntity.id : undefined;
-
-    let targetRecord: PaymentRecord | undefined;
-
-    if (orderId) {
-      const now = new Date().toISOString();
-      const existing = store.payments.find((p) => p.orderId === orderId);
-      if (existing) {
-        if (paymentId) existing.paymentId = paymentId;
-        existing.webhookVerified = Boolean(webhookSecret);
-        existing.webhookEvent = eventName;
-        if (eventName === 'payment.captured' || eventName === 'order.paid') {
-          existing.status =
-            existing.status === 'Paid (Verified)' ? 'Paid (Verified)' : 'Captured (Webhook)';
-        } else if (eventName === 'payment.failed' && existing.status === 'Created') {
-          existing.status = 'Failed';
-        }
-        existing.updatedAt = now;
-        saveStore(store);
-        targetRecord = existing;
-      } else if (eventName === 'payment.captured' || eventName === 'order.paid') {
-        const amountPaise = Number(paymentEntity?.amount || orderEntity?.amount || 0);
-        const notes = paymentEntity?.notes || orderEntity?.notes || {};
-        const notePlanId = typeof notes.planId === 'string' ? notes.planId : 'external';
-        const matchedPlan = AUTHORITATIVE_PLANS[notePlanId];
-        targetRecord = {
-          id: `NOV-WH-${Date.now().toString(36).toUpperCase()}`,
-          orderId,
-          paymentId,
-          planId: notePlanId,
-          planName:
-            typeof notes.planName === 'string'
-              ? notes.planName
-              : matchedPlan?.name || 'Razorpay Payment',
-          billing: matchedPlan?.billing || 'standard plan',
-          services: matchedPlan?.features || [
-            'Custom Novesta digital growth onboarding & setup',
-          ],
-          amountInr: Math.round(amountPaise / 100),
-          amountPaise,
-          currency: 'INR',
-          customerName: typeof notes.customerName === 'string' ? notes.customerName : 'Razorpay Customer',
-          customerPhone:
-            typeof paymentEntity?.contact === 'string'
-              ? paymentEntity.contact
-              : typeof notes.customerPhone === 'string'
-                ? notes.customerPhone
-                : '',
-          customerEmail:
-            typeof paymentEntity?.email === 'string'
-              ? paymentEntity.email
-              : typeof notes.customerEmail === 'string'
-                ? notes.customerEmail
-                : '',
-          businessName: typeof notes.businessName === 'string' ? notes.businessName : 'Not specified',
-          status: 'Captured (Webhook)',
-          webhookVerified: Boolean(webhookSecret),
-          webhookEvent: eventName,
-          createdAt: now,
-          updatedAt: now,
-        };
-        store.payments.unshift(targetRecord);
-        saveStore(store);
-      }
-    }
-
-    if (
-      targetRecord &&
-      (eventName === 'payment.captured' || eventName === 'order.paid') &&
-      !targetRecord.confirmationEmailsSentAt
-    ) {
-      await sendPaymentConfirmationEmails(targetRecord, store);
-    }
-
-    console.info('[Novesta Razorpay Webhook]', {
-      event: eventName,
-      orderId,
-      paymentId,
-      signatureVerified: Boolean(webhookSecret),
-    });
-
-    res.status(200).json({ ok: true, received: true, event: eventName });
-  });
-
-  // Serve /favicon.ico cleanly from optimized 3.5 KB PNG so browsers never download 467 KB or hit 404
+  // Serve /favicon.ico cleanly
   app.get('/favicon.ico', (_req, res) => {
     const publicIcon = path.resolve(__dirname, 'public/assets/novesta-mark-96.png');
     const distIcon = path.resolve(__dirname, 'dist/assets/novesta-mark-96.png');
@@ -2054,31 +614,43 @@ async function startServer() {
       .send('google-site-verification: google1e529b83336dbecf.html');
   });
 
-  // Google AdSense ads.txt publisher verification endpoint
+  // ads.txt placeholder until AdSense / publisher approval
   app.get('/ads.txt', (_req, res) => {
     res
       .type('text/plain; charset=utf-8')
       .setHeader('Cache-Control', 'public, max-age=3600')
-      .send('google.com, pub-4698892959376775, DIRECT, f08c47fec0942fa0\n');
+      .send(
+        '# PDFIndia ads.txt placeholder\n# Add your verified publisher line only after site approval.\n'
+      );
   });
 
-  // Dynamic robots.txt & sitemap.xml using APP_URL or live request origin
+  // Dynamic robots.txt
   app.get('/robots.txt', (req, res) => {
     const baseUrl = resolveBaseUrl(req);
     res
       .type('text/plain; charset=utf-8')
       .setHeader('Cache-Control', 'public, max-age=3600')
-      .send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\n\nSitemap: ${baseUrl}/sitemap.xml\n`);
+      .send(`User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${baseUrl}/sitemap.xml\n`);
   });
 
+  // Dynamic sitemap.xml listing all active PDFIndia routes + /careers
   app.get('/sitemap.xml', (req, res) => {
     const baseUrl = resolveBaseUrl(req);
     const today = new Date().toISOString().split('T')[0];
     const routes = [
       { path: '/', changefreq: 'weekly', priority: '1.0' },
-      { path: '/careers', changefreq: 'weekly', priority: '0.8' },
-      { path: '/privacy', changefreq: 'monthly', priority: '0.4' },
-      { path: '/terms', changefreq: 'monthly', priority: '0.4' },
+      { path: '/upsc-photo-signature-resizer', changefreq: 'weekly', priority: '0.9' },
+      { path: '/ssc-photo-resizer', changefreq: 'weekly', priority: '0.9' },
+      { path: '/ibps-photo-signature-resizer', changefreq: 'weekly', priority: '0.9' },
+      { path: '/passport-photo-maker', changefreq: 'weekly', priority: '0.9' },
+      { path: '/compress-pdf', changefreq: 'weekly', priority: '0.9' },
+      { path: '/merge-pdf', changefreq: 'weekly', priority: '0.9' },
+      { path: '/split-pdf', changefreq: 'weekly', priority: '0.9' },
+      { path: '/about', changefreq: 'monthly', priority: '0.6' },
+      { path: '/contact', changefreq: 'monthly', priority: '0.6' },
+      { path: '/privacy', changefreq: 'monthly', priority: '0.5' },
+      { path: '/terms', changefreq: 'monthly', priority: '0.5' },
+      { path: '/careers', changefreq: 'weekly', priority: '0.7' },
     ];
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -2100,7 +672,7 @@ ${routes
   });
 
   /**
-   * Real-time Consultation Request Endpoint
+   * Contact Endpoint (SMTP with Resend fallback)
    */
   app.post('/api/contact', async (req, res) => {
     const validation = validateContactPayload(req.body || {});
@@ -2130,16 +702,16 @@ ${routes
       to: getBusinessAlertRecipients(),
       replyTo: email,
       fromLabel: 'Novesta Website',
-      subject: `[Novesta Lead ${record.id}] ${businessType}${plan ? ` (${plan})` : ''} — ${name}`,
+      subject: `[Novesta Contact ${record.id}] ${name}`,
       text: [
-        `New consultation inquiry from Novesta website`,
+        `New inquiry from Novesta website`,
         `Reference ID: ${record.id}`,
         ``,
         `Name: ${name}`,
-        `Phone / WhatsApp: ${phone}`,
+        ...(phone ? [`Phone / WhatsApp: ${phone}`] : []),
         `Email: ${email}`,
-        `Business Type: ${businessType}`,
-        `Selected Plan: ${plan || 'Not specified'}`,
+        ...(businessType ? [`Category: ${businessType}`] : []),
+        ...(plan ? [`Reference: ${plan}`] : []),
         ``,
         `Message:`,
         message,
@@ -2153,7 +725,6 @@ ${routes
     console.info('[Novesta Contact Accepted]', {
       id: record.id,
       name,
-      businessType,
       delivered,
     });
 
@@ -2170,7 +741,7 @@ ${routes
       },
       message: delivered
         ? `Request ${record.id} accepted and sent to our team. Expect a reply within 1 business day.`
-        : `Request ${record.id} accepted and queued. You can also share this reference directly on WhatsApp.`,
+        : `Request ${record.id} accepted and queued.`,
     });
   });
 
@@ -2252,7 +823,7 @@ ${routes
         `02. Hard problem solved from scratch:`,
         answer2,
         ``,
-        `03. Local conversion fixes:`,
+        `03. Conversion fixes:`,
         answer3,
       ].join('\n'),
     });
@@ -2281,9 +852,27 @@ ${routes
       },
       roleApplicantCount: roleCount,
       message: delivered
-        ? `Application ${record.id} accepted and sent to the founder.`
+        ? `Application ${record.id} accepted and sent to our team.`
         : `Application ${record.id} accepted! You can also share your reference ID directly on WhatsApp.`,
     });
+  });
+
+  // Return 404 JSON for any unknown /api/* route
+  app.all('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found' });
+  });
+
+  // 301 Permanent Redirects for removed legacy routes to "/"
+  app.get(['/admin', '/admin/*'], (_req, res) => {
+    res.redirect(301, '/');
+  });
+
+  app.get('*', (req, res, next) => {
+    if (shouldRedirectToHome(req.path)) {
+      res.redirect(301, '/');
+      return;
+    }
+    next();
   });
 
   if (!isProduction) {
@@ -2303,7 +892,7 @@ ${routes
     });
     app.use(vite.middlewares);
   } else {
-    // Enable zero-dependency Brotli / Gzip compression for static JS, CSS, JSON, SVG, and HTML in production
+    // Zero-dependency Brotli / Gzip compression for static text assets in production
     app.use((req, res, next) => {
       const acceptEncoding = String(req.headers['accept-encoding'] || '');
       const encoding = acceptEncoding.includes('br')
@@ -2338,7 +927,11 @@ ${routes
         return shouldCompress;
       };
 
-      res.write = ((chunk: unknown, encodingArg?: BufferEncoding | ((error: Error | null | undefined) => void), cb?: (error: Error | null | undefined) => void) => {
+      res.write = ((
+        chunk: unknown,
+        encodingArg?: BufferEncoding | ((error: Error | null | undefined) => void),
+        cb?: (error: Error | null | undefined) => void
+      ) => {
         if (!decideCompression()) {
           return originalWrite(chunk as never, encodingArg as never, cb as never);
         }
@@ -2404,7 +997,6 @@ ${routes
       );
     }
 
-    // Serve remaining public/dist assets without shadowing / -> SEO HTML injector
     app.use(express.static(distPath, { index: false, maxAge: '7d' }));
 
     const indexPath = path.join(distPath, 'index.html');
@@ -2414,58 +1006,86 @@ ${routes
 
     const ROUTE_SEO: Record<string, { title: string; description: string }> = {
       '/': {
-        title: 'Novesta — Grow Online. Sell More. Rank Higher.',
+        title: 'PDFIndia — Free Exam Photo, Signature & PDF Tools for India',
         description:
-          'Novesta builds fast websites, online ordering systems, Google Maps rankings, SEO, and AI WhatsApp automation to grow your business online.',
+          '100% private, browser-based document prep for Indian exams and portals. Resize UPSC, SSC & IBPS photos, make 35x45mm passport sheets, and compress, merge, or split PDFs locally.',
       },
-      '/careers': {
-        title: 'Careers at Novesta — Engineering & Growth Roles',
+      '/upsc-photo-signature-resizer': {
+        title: 'UPSC Photo & Signature Resizer (20KB–300KB, 350–1000 px) — PDFIndia',
         description:
-          'Join Novesta in Jalgaon or remotely. Build high-speed websites, SEO engines, Google Maps visibility, and AI WhatsApp automation.',
+          'Resize UPSC CSE, NDA, CDS & OTR photos and signatures to 350–1000 px and 20–300 KB JPG locally in your browser.',
+      },
+      '/ssc-photo-resizer': {
+        title: 'SSC Photo & Signature Resizer (20KB–50KB & 10KB–20KB) — PDFIndia',
+        description:
+          'Resize SSC CGL, CHSL, GD & MTS photos (3.5×4.5 cm, 20–50 KB) and signatures (4.0×2.0 cm, 10–20 KB) locally in your browser.',
+      },
+      '/ibps-photo-signature-resizer': {
+        title: 'IBPS & SBI Photo & Signature Resizer (200×230 px, 140×60 px) — PDFIndia',
+        description:
+          'Resize IBPS PO, Clerk, RRB & SBI photos (200×230 px) and signatures (140×60 px) privately in your browser.',
+      },
+      '/passport-photo-maker': {
+        title: 'Indian Passport Photo Maker (35×45 mm) & 8-Copy Print Sheet — PDFIndia',
+        description:
+          'Create 35×45 mm (413×531 px, 300 DPI) passport photos with optional Name & Date strip plus 8-copy A4 or 6×4 printable sheets locally.',
+      },
+      '/compress-pdf': {
+        title: 'Compress PDF Under 200KB, 500KB, 1MB or 2MB Online (Local) — PDFIndia',
+        description:
+          'Reduce PDF size to under 2MB, 1MB, 500KB, or 200KB for Indian government & exam portals 100% locally in your browser.',
+      },
+      '/merge-pdf': {
+        title: 'Merge PDF & Images to A4 PDF Online (Optional 2MB Cap) — PDFIndia',
+        description:
+          'Combine PDFs, JPGs, and PNGs into one A4 PDF with drag reorder, 90° rotation, and optional 2MB cap locally.',
+      },
+      '/split-pdf': {
+        title: 'Split PDF & Extract Pages Locally (1, 3-5 Ranges) — PDFIndia',
+        description:
+          'Extract exact PDF pages or ranges with visual thumbnails and lossless text quality locally in your browser.',
+      },
+      '/about': {
+        title: 'About PDFIndia — A Novesta product',
+        description:
+          'Learn how PDFIndia prepares Indian exam photos, signatures, and PDFs 100% locally in your browser with zero uploads.',
+      },
+      '/contact': {
+        title: 'Contact PDFIndia — Support & Exam Preset Updates',
+        description:
+          'Contact PDFIndia for exam preset updates, bug reports, or DPDP privacy requests.',
       },
       '/privacy': {
-        title: 'Privacy Policy — Novesta Digital Growth',
+        title: 'Privacy Policy (DPDP Act) — PDFIndia',
         description:
-          "Read Novesta's privacy policy covering inquiry data, consultation requests, analytics, and embedded Google Maps usage details.",
+          '100% local browser processing with zero file uploads, contact delivery, advertising cookie consent, and India DPDP Act rights.',
       },
       '/terms': {
-        title: 'Terms of Service — Novesta Digital Growth',
+        title: 'Terms of Use — PDFIndia',
         description:
-          "Review Novesta's terms of service covering project scope, client code and domain ownership, and third-party platform integrations.",
+          'Terms of use for PDFIndia. Independent product by Novesta, not affiliated with UPSC, SSC, IBPS, or any government body.',
+      },
+      '/careers': {
+        title: 'Careers at Novesta',
+        description: 'Open roles and applications at Novesta.',
       },
     };
 
-    app.get(['/', '/careers', '/privacy', '/terms', '/admin', '*'], (req, res) => {
-      if (req.path.startsWith('/api/')) {
-        res.status(404).json({ error: 'API endpoint not found' });
-        return;
-      }
-
+    app.get(Array.from(ACTIVE_APP_ROUTES), (req, res) => {
       if (!cachedTemplate) {
         res.status(404).send('Build output not found. Run npm run build first.');
         return;
       }
 
       const baseUrl = resolveBaseUrl(req);
-      const isPrivateAdmin = req.path === '/admin';
-      const normalizedPath = ROUTE_SEO[req.path] ? req.path : '/';
-      const routeMeta = ROUTE_SEO[normalizedPath];
+      const normalizedPath = req.path.replace(/\/+$/, '') || '/';
+      const routeMeta = ROUTE_SEO[normalizedPath] || ROUTE_SEO['/'];
       const canonicalUrl = `${baseUrl}${normalizedPath === '/' ? '/' : normalizedPath}`;
-      const ogImageUrl = `${baseUrl}/assets/aistudio/Novesta_72b3be73.png`;
       const gscToken =
         process.env.VITE_GSC_VERIFICATION || process.env.GSC_VERIFICATION || '';
 
       let html = cachedTemplate
-        .replace(
-          /<title>.*?<\/title>/,
-          `<title>${isPrivateAdmin ? 'Founder Access — Novesta' : routeMeta.title}</title>`
-        )
-        .replace(
-          /<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/i,
-          isPrivateAdmin
-            ? '<meta name="robots" content="noindex, nofollow" />'
-            : '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />'
-        )
+        .replace(/<title>.*?<\/title>/, `<title>${routeMeta.title}</title>`)
         .replace(
           /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
           `<meta name="description" content="${routeMeta.description}" />`
@@ -2487,10 +1107,6 @@ ${routes
           `<meta property="og:description" content="${routeMeta.description}" />`
         )
         .replace(
-          /<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/i,
-          `<meta property="og:image" content="${ogImageUrl}" />`
-        )
-        .replace(
           /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
           `<meta name="twitter:title" content="${routeMeta.title}" />`
         )
@@ -2498,12 +1114,7 @@ ${routes
           /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
           `<meta name="twitter:description" content="${routeMeta.description}" />`
         )
-        .replace(
-          /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/i,
-          `<meta name="twitter:image" content="${ogImageUrl}" />`
-        )
-        .replace(/https:\/\/novesta\.(?:online|in)/g, baseUrl)
-        .replace(/"\/assets\/aistudio\/Novesta_72b3be73\.png"/g, `"${ogImageUrl}"`);
+        .replace(/https:\/\/novesta\.(?:online|in)/g, baseUrl);
 
       if (gscToken && !gscToken.startsWith('REPLACE_')) {
         html = html.replace(
@@ -2516,7 +1127,7 @@ ${routes
         .status(200)
         .type('text/html; charset=utf-8')
         .setHeader('Cache-Control', 'no-cache')
-        .setHeader('X-Robots-Tag', isPrivateAdmin ? 'noindex, nofollow' : 'index, follow')
+        .setHeader('X-Robots-Tag', 'index, follow')
         .send(html);
     });
   }

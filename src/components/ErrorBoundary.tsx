@@ -1,63 +1,56 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
-interface ErrorBoundaryProps {
+interface Props {
   children: ReactNode;
 }
 
-interface ErrorBoundaryState {
+interface State {
   hasError: boolean;
-  errorMessage: string;
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
     hasError: false,
-    errorMessage: '',
   };
 
-  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return {
-      hasError: true,
-      errorMessage: error?.message || 'An unexpected rendering error occurred.',
-    };
+  public static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
-  public componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('[Novesta ErrorBoundary]', error, info.componentStack);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('PDFIndia ErrorBoundary caught error:', error, errorInfo);
   }
 
   private handleReload = () => {
-    this.setState({ hasError: false, errorMessage: '' });
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
+    window.location.reload();
   };
 
-  public render(): ReactNode {
+  public render() {
     if (this.state.hasError) {
       return (
         <div
-          role="alert"
-          className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] px-4 py-16 text-[var(--color-ink)]"
+          className="flex min-h-screen items-center justify-center p-4"
+          style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-navy)' }}
         >
-          <div className="novesta-card max-w-md p-8 text-center">
-            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-error)]/40 bg-[var(--color-error)]/10 text-[var(--color-error)]">
+          <div className="pdf-card max-w-md space-y-4 p-8 text-center">
+            <div
+              className="mx-auto flex h-12 w-12 items-center justify-center rounded-[12px]"
+              style={{ backgroundColor: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+            >
               <AlertCircle className="h-6 w-6" aria-hidden="true" />
             </div>
-            <h1 className="mt-4 text-[20px] font-medium text-[var(--color-text-tertiary)]">
-              Something went wrong
-            </h1>
-            <p className="mt-2 text-[14px] leading-6 text-[var(--color-ink-secondary)]">
-              We hit an unexpected issue loading this view. Reload the page to continue.
+            <h1 className="text-lg font-bold">Something went wrong</h1>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+              An unexpected error occurred in your browser tab. Reload the page to reset the workspace safely—your files were never uploaded.
             </p>
             <button
               type="button"
               onClick={this.handleReload}
-              className="resend-btn-primary mt-6 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-6 py-2.5 text-[14px] font-medium"
+              className="pdf-btn-primary inline-flex min-h-[44px] items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold"
             >
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              <span>Reload Page</span>
+              Reload PDFIndia
             </button>
           </div>
         </div>

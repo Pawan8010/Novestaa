@@ -1,429 +1,496 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { AnnouncementBar } from './components/AnnouncementBar';
+import {
+  FileDown,
+  FileImage,
+  FilePlus2,
+  IdCard,
+  Scissors,
+  ShieldCheck,
+} from 'lucide-react';
 import { Header } from './components/Header';
-import { HeroSection } from './components/HeroSection';
-import { PromiseSection } from './components/PromiseSection';
-import { FeaturePanel } from './components/FeaturePanel';
 import { Footer } from './components/Footer';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AdSlot } from './components/ads/AdSlot';
+import { CookieConsentBanner, type ConsentChoice } from './components/ads/CookieConsentBanner';
 import { siteConfig } from './config/site';
+import {
+  getToolRouteByPath,
+  HOME_GUIDE_DATA,
+  TOOL_ROUTES,
+  type ToolId,
+} from './content/guides';
 
-const ReachSection = lazy(() =>
-  import('./components/ReachSection').then((m) => ({ default: m.ReachSection }))
+// Heavy tool modules & guides are strictly lazy-loaded on demand
+const ExamPhotoResizer = lazy(() =>
+  import('./tools/ExamPhotoResizer').then((m) => ({ default: m.ExamPhotoResizer }))
 );
-const PricingSection = lazy(() =>
-  import('./components/PricingSection').then((m) => ({ default: m.PricingSection }))
+const PassportPhotoMaker = lazy(() =>
+  import('./tools/PassportPhotoMaker').then((m) => ({ default: m.PassportPhotoMaker }))
 );
-const IndustriesSection = lazy(() =>
-  import('./components/IndustriesSection').then((m) => ({ default: m.IndustriesSection }))
+const PdfCompressor = lazy(() =>
+  import('./tools/PdfCompressor').then((m) => ({ default: m.PdfCompressor }))
 );
-const ProcessSection = lazy(() =>
-  import('./components/ProcessSection').then((m) => ({ default: m.ProcessSection }))
+const PdfMerger = lazy(() =>
+  import('./tools/PdfMerger').then((m) => ({ default: m.PdfMerger }))
 );
-const FounderSection = lazy(() =>
-  import('./components/FounderSection').then((m) => ({ default: m.FounderSection }))
+const PdfSplitter = lazy(() =>
+  import('./tools/PdfSplitter').then((m) => ({ default: m.PdfSplitter }))
 );
-const FeedbackSection = lazy(() =>
-  import('./components/FeedbackSection').then((m) => ({ default: m.FeedbackSection }))
+const HomeGuide = lazy(() =>
+  import('./components/HomeGuide').then((m) => ({ default: m.HomeGuide }))
 );
-const FaqAccordion = lazy(() =>
-  import('./components/FaqAccordion').then((m) => ({ default: m.FaqAccordion }))
+const ToolRouteGuide = lazy(() =>
+  import('./components/HomeGuide').then((m) => ({ default: m.ToolRouteGuide }))
 );
-const ContactSection = lazy(() =>
-  import('./components/ContactSection').then((m) => ({ default: m.ContactSection }))
+const AboutPage = lazy(() =>
+  import('./components/legal/AboutPage').then((m) => ({ default: m.AboutPage }))
+);
+const ContactPage = lazy(() =>
+  import('./components/legal/ContactPage').then((m) => ({ default: m.ContactPage }))
+);
+const PrivacyPage = lazy(() =>
+  import('./components/legal/PrivacyPage').then((m) => ({ default: m.PrivacyPage }))
+);
+const TermsPage = lazy(() =>
+  import('./components/legal/TermsPage').then((m) => ({ default: m.TermsPage }))
 );
 const CareersPage = lazy(() =>
   import('./components/CareersPage').then((m) => ({ default: m.CareersPage }))
 );
-const LegalPage = lazy(() =>
-  import('./components/LegalPages').then((m) => ({ default: m.LegalPage }))
-);
-const FounderPortal = lazy(() =>
-  import('./components/FounderPortal').then((m) => ({ default: m.FounderPortal }))
-);
 
-type AppRoute = '/' | '/careers' | '/privacy' | '/terms' | '/admin';
+const VALID_STATIC_ROUTES = new Set([
+  '/',
+  '/about',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/careers',
+  ...TOOL_ROUTES.map((r) => r.path),
+]);
 
-function normalizePath(pathname: string): AppRoute {
-  if (pathname === '/careers') return '/careers';
-  if (pathname === '/privacy') return '/privacy';
-  if (pathname === '/terms') return '/terms';
-  if (pathname === '/admin') return '/admin';
-  return '/';
+function normalizePath(pathname: string): string {
+  const clean = pathname.replace(/\/+$/, '') || '/';
+  return VALID_STATIC_ROUTES.has(clean) ? clean : '/';
 }
 
+const TOOL_TABS: Array<{
+  id: ToolId;
+  label: string;
+  shortDesc: string;
+  icon: typeof FileImage;
+}> = [
+  { id: 'exam-resizer', label: 'Exam Photo & Sign', shortDesc: 'UPSC, SSC, IBPS, Custom', icon: FileImage },
+  { id: 'passport-maker', label: 'Passport Photo', shortDesc: '35×45 mm + 8-copy sheet', icon: IdCard },
+  { id: 'compress-pdf', label: 'Compress PDF', shortDesc: 'Under 200KB–2MB', icon: FileDown },
+  { id: 'merge-pdf', label: 'Merge PDF', shortDesc: 'PDF + Images to A4', icon: FilePlus2 },
+  { id: 'split-pdf', label: 'Split PDF', shortDesc: 'Extract pages (1, 3-5)', icon: Scissors },
+];
+
+const ToolLoadingFallback = () => (
+  <div className="pdf-card flex min-h-[260px] items-center justify-center p-8 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+    Loading browser-local workspace…
+  </div>
+);
+
 export default function App() {
-  const [currentPath, setCurrentPath] = useState<AppRoute>(() =>
+  const [currentPath, setCurrentPath] = useState<string>(() =>
     typeof window !== 'undefined' ? normalizePath(window.location.pathname) : '/'
   );
-  const [currentHash, setCurrentHash] = useState<string>(() =>
-    typeof window !== 'undefined' ? window.location.hash : ''
-  );
-  const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
-  const [selectedBusinessType, setSelectedBusinessType] = useState<string | undefined>(
-    undefined
-  );
-  const [selectedPlan, setSelectedPlan] = useState<string | undefined>(undefined);
-  const [selectedCity, setSelectedCity] = useState<string | undefined>(undefined);
-  const [preselectTick, setPreselectTick] = useState(0);
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [homeTool, setHomeTool] = useState<ToolId>('exam-resizer');
+  const [consent, setConsent] = useState<ConsentChoice>({
+    essential: true,
+    advertising: false,
+    decided: false,
+  });
+  const [isCookiePrefsOpen, setIsCookiePrefsOpen] = useState(false);
 
-  // Listen for Google Maps Platform Demo Key quota exhaustion events
+  // Sync browser history navigation
   useEffect(() => {
-    const handleQuotaExceeded = () => setQuotaExceeded(true);
-    window.addEventListener('gmp-quota-exceeded', handleQuotaExceeded);
-    return () => window.removeEventListener('gmp-quota-exceeded', handleQuotaExceeded);
-  }, []);
-
-  // Optional GA4 script injection when a real Measurement ID is configured
-  useEffect(() => {
-    const gaId = siteConfig.seo.ga4MeasurementId;
-    if (!gaId || gaId.startsWith('G-XXXX')) return;
-    if (document.getElementById('novesta-ga4-script')) return;
-
-    const script = document.createElement('script');
-    script.id = 'novesta-ga4-script';
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaId)}`;
-    document.head.appendChild(script);
-
-    const inline = document.createElement('script');
-    inline.text = `window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${gaId}');`;
-    document.head.appendChild(inline);
-  }, []);
-
-  // Sync browser history navigation & initial URL hash
-  useEffect(() => {
-    const scrollToCurrentHash = () => {
-      const hash = window.location.hash;
-      if (!hash) return;
-      const el = document.querySelector(hash);
-      if (el) {
-        el.scrollIntoView({ behavior: 'auto' });
-      }
-    };
+    const normalized = normalizePath(window.location.pathname);
+    if (window.location.pathname !== normalized) {
+      window.history.replaceState({}, '', normalized);
+    }
 
     const handlePopState = () => {
       setCurrentPath(normalizePath(window.location.pathname));
-      setCurrentHash(window.location.hash || '');
-      setTimeout(scrollToCurrentHash, 80);
     };
-
-    const handleHashChange = () => {
-      setCurrentHash(window.location.hash || '');
-    };
-
-    if (window.location.hash) {
-      setTimeout(scrollToCurrentHash, 120);
-      setTimeout(scrollToCurrentHash, 450);
-    }
 
     window.addEventListener('popstate', handlePopState);
-    window.addEventListener('hashchange', handleHashChange);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('hashchange', handleHashChange);
-    };
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Update document title, meta tags, OpenGraph & canonical URL per route
+  // Update SEO metadata, canonical URL, absolute OG image & structured JSON-LD per route
   useEffect(() => {
-    const routeMeta: Record<AppRoute, { title: string; description: string }> = {
-      '/': {
-        title: siteConfig.seo.title,
-        description: siteConfig.seo.description,
-      },
-      '/careers': {
-        title: `Careers at ${siteConfig.brand.name} — Engineering & Growth Roles`,
-        description: `Join ${siteConfig.brand.name} in Jalgaon or remotely. Build high-speed websites, SEO engines, Google Maps visibility, and AI WhatsApp automation.`,
-      },
-      '/privacy': {
-        title: `Privacy Policy — ${siteConfig.brand.name} Digital Growth`,
-        description: `Read ${siteConfig.brand.name}'s privacy policy covering inquiry data, consultation requests, analytics, and embedded Google Maps usage details.`,
-      },
-      '/terms': {
-        title: `Terms of Service — ${siteConfig.brand.name} Digital Growth`,
-        description: `Review ${siteConfig.brand.name}'s terms of service covering project scope, client code and domain ownership, and third-party platform integrations.`,
-      },
-      '/admin': {
-        title: `Founder Workspace — ${siteConfig.brand.name}`,
-        description: `Private founder workspace for managing ${siteConfig.brand.name} career role listings and submitted inquiries.`,
-      },
-    };
+    const toolRoute = getToolRouteByPath(currentPath);
+    const origin =
+      typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin
+        : siteConfig.seo.canonicalBaseUrl;
 
-    const meta = routeMeta[currentPath];
-    document.title = meta.title;
+    let title = siteConfig.seo.title;
+    let description = siteConfig.seo.description;
+    let breadcrumbLabel = 'Home';
 
-    const setMetaTag = (selector: string, content: string) => {
+    if (toolRoute) {
+      title = toolRoute.title;
+      description = toolRoute.description;
+      breadcrumbLabel = toolRoute.navLabel;
+    } else if (currentPath === '/about') {
+      title = `About ${siteConfig.brand.name} — ${siteConfig.brand.parentLine}`;
+      description = `Learn how ${siteConfig.brand.name} processes Indian exam photos, signatures, and PDFs 100% locally in your browser with zero file uploads.`;
+      breadcrumbLabel = 'About';
+    } else if (currentPath === '/contact') {
+      title = `Contact ${siteConfig.brand.name} — Support & Exam Preset Updates`;
+      description = `Contact the ${siteConfig.brand.name} team at ${siteConfig.supportEmail} for exam preset updates, bug reports, or privacy inquiries.`;
+      breadcrumbLabel = 'Contact';
+    } else if (currentPath === '/privacy') {
+      title = `Privacy Policy (DPDP Act) — ${siteConfig.brand.name}`;
+      description = `How ${siteConfig.brand.name} keeps your documents 100% local in your browser with zero uploads, plus contact email and DPDP Act rights.`;
+      breadcrumbLabel = 'Privacy Policy';
+    } else if (currentPath === '/terms') {
+      title = `Terms of Use — ${siteConfig.brand.name}`;
+      description = `Terms of use for ${siteConfig.brand.name}. Independent toolset not affiliated with UPSC, SSC, IBPS, or any government body.`;
+      breadcrumbLabel = 'Terms of Use';
+    } else if (currentPath === '/careers') {
+      title = 'Careers at Novesta';
+      description = 'Open roles and applications at Novesta.';
+      breadcrumbLabel = 'Careers';
+    }
+
+    document.title = title;
+    const canonicalUrl = `${origin}${currentPath === '/' ? '/' : currentPath}`;
+    const absoluteOgImage = `${origin}${siteConfig.brand.ogImagePath}`;
+
+    const setMeta = (selector: string, attr: string, value: string) => {
       const el = document.querySelector(selector);
-      if (el) {
-        el.setAttribute('content', content);
-      }
+      if (el) el.setAttribute(attr, value);
     };
 
-    setMetaTag(
-      'meta[name="robots"]',
-      currentPath === '/admin'
-        ? 'noindex, nofollow'
-        : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
-    );
-    setMetaTag('meta[name="description"]', meta.description);
-    setMetaTag('meta[property="og:title"]', meta.title);
-    setMetaTag('meta[property="og:description"]', meta.description);
-    setMetaTag('meta[name="twitter:title"]', meta.title);
-    setMetaTag('meta[name="twitter:description"]', meta.description);
+    setMeta('meta[name="description"]', 'content', description);
+    setMeta('link[rel="canonical"]', 'href', canonicalUrl);
+    setMeta('meta[property="og:url"]', 'content', canonicalUrl);
+    setMeta('meta[property="og:title"]', 'content', title);
+    setMeta('meta[property="og:description"]', 'content', description);
+    setMeta('meta[property="og:image"]', 'content', absoluteOgImage);
+    setMeta('meta[name="twitter:title"]', 'content', title);
+    setMeta('meta[name="twitter:description"]', 'content', description);
+    setMeta('meta[name="twitter:image"]', 'content', absoluteOgImage);
 
-    if (typeof window !== 'undefined') {
-      const canonicalUrl = `${window.location.origin}${currentPath}`;
-      const canonical = document.querySelector('link[rel="canonical"]');
-      if (canonical) {
-        canonical.setAttribute('href', canonicalUrl);
-      }
-      setMetaTag('meta[property="og:url"]', canonicalUrl);
-      setMetaTag(
-        'meta[property="og:image"]',
-        `${window.location.origin}/assets/aistudio/Novesta_72b3be73.png`
-      );
-      setMetaTag(
-        'meta[name="twitter:image"]',
-        `${window.location.origin}/assets/aistudio/Novesta_72b3be73.png`
-      );
+    // Structured data: WebApplication + BreadcrumbList (+ FAQPage on Home)
+    const graph: Array<Record<string, unknown>> = [
+      {
+        '@type': 'WebApplication',
+        name: siteConfig.brand.name,
+        url: canonicalUrl,
+        applicationCategory: 'UtilitiesApplication',
+        operatingSystem: 'Web Browser',
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'INR',
+        },
+        description,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement:
+          currentPath === '/'
+            ? [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` }]
+            : [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` },
+                { '@type': 'ListItem', position: 2, name: breadcrumbLabel, item: canonicalUrl },
+              ],
+      },
+    ];
+
+    if (currentPath === '/') {
+      graph.push({
+        '@type': 'FAQPage',
+        mainEntity: HOME_GUIDE_DATA.faqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.answer,
+          },
+        })),
+      });
     }
 
-    const gscToken = siteConfig.seo.googleSiteVerification;
-    if (gscToken && !gscToken.startsWith('REPLACE_')) {
-      let gscMeta = document.querySelector('meta[name="google-site-verification"]');
-      if (!gscMeta) {
-        gscMeta = document.createElement('meta');
-        gscMeta.setAttribute('name', 'google-site-verification');
-        document.head.appendChild(gscMeta);
-      }
-      gscMeta.setAttribute('content', gscToken);
+    let ldScript = document.getElementById('pdfindia-jsonld') as HTMLScriptElement | null;
+    if (!ldScript) {
+      ldScript = document.createElement('script');
+      ldScript.id = 'pdfindia-jsonld';
+      ldScript.type = 'application/ld+json';
+      document.head.appendChild(ldScript);
     }
+    ldScript.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': graph,
+    });
   }, [currentPath]);
 
-  const navigate = useCallback((path: string, hash?: string) => {
-    const targetPath = normalizePath(path);
-    const nextHash = hash || '';
-    const targetUrl = nextHash ? `${targetPath}${nextHash}` : targetPath;
+  const navigate = useCallback((path: string) => {
+    const target = normalizePath(path);
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', targetUrl);
-    }
-    setCurrentPath(targetPath);
-    setCurrentHash(nextHash);
-
-    if (nextHash) {
-      const tryScroll = () => {
-        const el = document.querySelector(nextHash);
-        if (el) {
-          el.scrollIntoView({ behavior: 'auto' });
-        }
-      };
-      requestAnimationFrame(tryScroll);
-      setTimeout(tryScroll, 220);
-    } else if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', target);
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
+    setCurrentPath(target);
   }, []);
 
-  const scrollToContact = useCallback(() => {
-    navigate('/', '#contact');
-  }, [navigate]);
+  const renderToolById = (toolId: ToolId, defaultPresetId?: string) => {
+    switch (toolId) {
+      case 'exam-resizer':
+        return <ExamPhotoResizer initialPresetId={defaultPresetId || 'upsc-photo'} />;
+      case 'passport-maker':
+        return <PassportPhotoMaker />;
+      case 'compress-pdf':
+        return <PdfCompressor />;
+      case 'merge-pdf':
+        return <PdfMerger />;
+      case 'split-pdf':
+        return <PdfSplitter />;
+    }
+  };
 
-  const handleServiceQuote = useCallback(
-    (serviceTitle: string) => {
-      setSelectedService(serviceTitle);
-      setPreselectTick((n) => n + 1);
-      navigate('/', '#contact');
-    },
-    [navigate]
-  );
+  // Preserve /careers completely untouched inside scoped dark theme
+  if (currentPath === '/careers') {
+    return (
+      <ErrorBoundary>
+        <div className="careers-dark-scope min-h-screen bg-[#000000] text-[#f0f0f0]">
+          <Suspense
+            fallback={
+              <div className="mx-auto max-w-3xl px-4 py-24 text-[15px] text-[#a1a4a5]">
+                Loading careers…
+              </div>
+            }
+          >
+            <CareersPage onBackHome={() => navigate('/')} />
+          </Suspense>
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
-  const handleIndustryPlan = useCallback(
-    (businessType: string) => {
-      setSelectedBusinessType(businessType);
-      setPreselectTick((n) => n + 1);
-      navigate('/', '#contact');
-    },
-    [navigate]
-  );
-
-  const handlePlanSelect = useCallback(
-    (planName: string) => {
-      setSelectedPlan(planName);
-      setPreselectTick((n) => n + 1);
-      navigate('/', '#contact');
-    },
-    [navigate]
-  );
-
-  const handleCitySelect = useCallback(
-    (cityName: string) => {
-      setSelectedCity(cityName);
-      setPreselectTick((n) => n + 1);
-      navigate('/', '#contact');
-    },
-    [navigate]
-  );
+  const activeToolRoute = getToolRouteByPath(currentPath);
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen overflow-x-clip bg-[var(--color-bg)] text-[var(--color-ink)]">
-      {/* Skip-to-content accessibility link */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-[var(--color-btn-primary-bg)] focus:px-5 focus:py-2.5 focus:text-[14px] focus:font-medium focus:text-[var(--color-btn-primary-ink)]"
+      <div
+        className="flex min-h-screen flex-col overflow-x-clip"
+        style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-navy)' }}
       >
-        Skip to main content
-      </a>
+        {/* WCAG 2.2 AA Skip-to-content link */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[10px] focus:bg-[#0F172A] focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white"
+        >
+          Skip to main content
+        </a>
 
-      {/* Demo Key Quota Banner */}
-      {quotaExceeded && (
-        <div className="sticky top-0 z-50 border-b border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-2.5 text-center text-[13px] text-[var(--color-warning-text)]">
-          <span>
-            Google Maps Platform quota reached. If you are the app owner, visit{' '}
-            <a
-              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold underline"
-            >
-              maps developer site
-            </a>{' '}
-            for instructions to update your account.
-          </span>
-        </div>
-      )}
+        <Header currentPath={currentPath} onNavigate={navigate} />
 
-      <AnnouncementBar onSeePricing={() => navigate('/', '#pricing')} />
-      <Header currentPath={currentPath} currentHash={currentHash} onNavigate={navigate} />
+        <main id="main-content" className="flex-1">
+          <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+            {/* Home Page: Instant above-the-fold tool workspace + below-the-fold SEO guide */}
+            {currentPath === '/' && (
+              <div className="space-y-10">
+                <section aria-labelledby="home-hero-title" className="space-y-5">
+                  <div className="max-w-3xl space-y-2.5">
+                    <h1
+                      id="home-hero-title"
+                      className="text-2xl font-bold tracking-tight sm:text-4xl"
+                      style={{ color: 'var(--color-navy)' }}
+                    >
+                      {siteConfig.brand.tagline}
+                    </h1>
+                    <p className="text-sm leading-relaxed sm:text-base" style={{ color: 'var(--color-text-secondary)' }}>
+                      Resize UPSC, SSC, and IBPS photos &amp; signatures to exact KB and 300 DPI rules, make 35×45 mm passport sheets, and compress, merge, or split PDFs—without uploading a single file.
+                    </p>
+                  </div>
 
-      <main id="main-content">
-        {currentPath === '/careers' ? (
-          <Suspense
-            fallback={
-              <div className="mx-auto max-w-3xl px-4 py-24 text-[15px] text-[var(--color-ink-secondary)]">
-                Loading careers...
-              </div>
-            }
-          >
-            <CareersPage
-              onBackHome={() => navigate('/')}
-              onManageRoles={() => navigate('/admin')}
-            />
-          </Suspense>
-        ) : currentPath === '/admin' ? (
-          <Suspense
-            fallback={
-              <div className="mx-auto max-w-3xl px-4 py-24 text-[15px] text-[var(--color-ink-secondary)]">
-                Loading founder workspace...
-              </div>
-            }
-          >
-            <FounderPortal
-              onBackHome={() => navigate('/')}
-              onOpenCareers={() => navigate('/careers')}
-            />
-          </Suspense>
-        ) : currentPath === '/privacy' ? (
-          <Suspense
-            fallback={
-              <div className="mx-auto max-w-3xl px-4 py-24 text-[15px] text-[var(--color-ink-secondary)]">
-                Loading privacy policy...
-              </div>
-            }
-          >
-            <LegalPage type="privacy" onBackHome={() => navigate('/')} />
-          </Suspense>
-        ) : currentPath === '/terms' ? (
-          <Suspense
-            fallback={
-              <div className="mx-auto max-w-3xl px-4 py-24 text-[15px] text-[var(--color-ink-secondary)]">
-                Loading terms of service...
-              </div>
-            }
-          >
-            <LegalPage type="terms" onBackHome={() => navigate('/')} />
-          </Suspense>
-        ) : (
-          <>
-            <HeroSection onConsultationClick={scrollToContact} />
-            <PromiseSection onConsultationClick={scrollToContact} />
-            <FeaturePanel onSelectServiceQuote={handleServiceQuote} />
-            <Suspense
-              fallback={
-                <section
-                  id="reach"
-                  className="scroll-mt-20 min-h-[540px] border-y border-[var(--color-globe-hairline)] bg-[var(--color-surface-inverse)]"
-                />
-              }
-            >
-              <ReachSection onGrowInCity={handleCitySelect} />
-            </Suspense>
-            <Suspense
-              fallback={
-                <section
-                  id="pricing"
-                  className="scroll-mt-20 min-h-[560px] bg-[var(--color-bg)]"
-                />
-              }
-            >
-              <PricingSection onSelectPlan={handlePlanSelect} />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[420px] bg-[var(--color-bg)]" />}>
-              <IndustriesSection onSelectIndustry={handleIndustryPlan} />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[420px] bg-[var(--color-bg-subtle)]" />}>
-              <ProcessSection />
-            </Suspense>
-            <Suspense
-              fallback={
-                <section
-                  id="about"
-                  className="scroll-mt-20 min-h-[280px] border-b border-[var(--color-border)] bg-[var(--color-bg)]"
-                />
-              }
-            >
-              <FounderSection />
-            </Suspense>
-            <Suspense
-              fallback={
-                <section
-                  id="feedback"
-                  className="scroll-mt-20 min-h-[440px] border-b border-[var(--color-border)] bg-[var(--color-bg)]"
-                />
-              }
-            >
-              <FeedbackSection />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[360px] bg-[var(--color-bg-subtle)]" />}>
-              <FaqAccordion />
-            </Suspense>
-            <Suspense
-              fallback={
-                <div
-                  id="contact"
-                  className="scroll-mt-20 bg-[var(--color-inverse-bg)] py-24 text-center text-[15px] text-[var(--color-inverse-muted)]"
-                >
-                  Loading contact form...
+                  {/* Tool Switcher Tabs */}
+                  <div
+                    role="tablist"
+                    aria-label="PDFIndia tools"
+                    className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+                  >
+                    {TOOL_TABS.map((tab) => {
+                      const Icon = tab.icon;
+                      const active = homeTool === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setHomeTool(tab.id)}
+                          className="flex min-h-[58px] items-center gap-3 rounded-[14px] border px-3.5 py-2.5 text-left transition-colors"
+                          style={{
+                            backgroundColor: active ? 'var(--color-navy)' : 'var(--color-surface)',
+                            borderColor: active ? 'var(--color-navy)' : 'var(--color-border)',
+                            color: active ? '#FFFFFF' : 'var(--color-navy)',
+                          }}
+                        >
+                          <Icon
+                            className="h-5 w-5 shrink-0"
+                            style={{ color: active ? '#F97316' : 'var(--color-saffron)' }}
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-semibold sm:text-sm">
+                              {tab.label}
+                            </div>
+                            <div
+                              className="truncate text-[11px]"
+                              style={{ color: active ? '#CBD5E1' : 'var(--color-text-secondary)' }}
+                            >
+                              {tab.shortDesc}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Active Tool Workspace */}
+                  <div className="pdf-card p-4 sm:p-6">
+                    <Suspense fallback={<ToolLoadingFallback />}>
+                      {renderToolById(homeTool)}
+                    </Suspense>
+                  </div>
+                </section>
+
+                {/* Non-intrusive Leaderboard Ad Placeholder cleanly separated from Download controls */}
+                <div className="py-2">
+                  <AdSlot variant="leaderboard" />
                 </div>
-              }
-            >
-              <ContactSection
-                preselectedService={selectedService}
-                preselectedBusinessType={selectedBusinessType}
-                preselectedPlan={selectedPlan}
-                preselectedCity={selectedCity}
-                preselectTick={preselectTick}
-                quotaExceeded={quotaExceeded}
-              />
-            </Suspense>
-          </>
-        )}
-      </main>
 
-      <Footer onNavigate={navigate} />
-    </div>
+                {/* Below-the-fold Home Guide + Sidebar Ad Placeholder */}
+                <div className="grid items-start gap-8 lg:grid-cols-12">
+                  <div className="lg:col-span-9">
+                    <Suspense fallback={<div className="py-8 text-sm text-slate-500">Loading guide…</div>}>
+                      <HomeGuide onNavigate={navigate} />
+                    </Suspense>
+                  </div>
+                  <div className="hidden lg:col-span-3 lg:block lg:sticky lg:top-24">
+                    <AdSlot variant="sidebar" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Dedicated SEO Tool Routes */}
+            {activeToolRoute && (
+              <div className="space-y-10">
+                <section aria-labelledby="tool-route-h1" className="space-y-5">
+                  <nav aria-label="Breadcrumb" className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                    <a
+                      href="/"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate('/');
+                      }}
+                      className="hover:underline underline-offset-2"
+                    >
+                      Home
+                    </a>
+                    <span className="mx-2" aria-hidden="true">/</span>
+                    <span style={{ color: 'var(--color-navy)' }}>{activeToolRoute.navLabel}</span>
+                  </nav>
+
+                  <div className="max-w-3xl space-y-2">
+                    <h1
+                      id="tool-route-h1"
+                      className="text-2xl font-bold tracking-tight sm:text-4xl"
+                      style={{ color: 'var(--color-navy)' }}
+                    >
+                      {activeToolRoute.h1}
+                    </h1>
+                    <p className="text-sm leading-relaxed sm:text-base" style={{ color: 'var(--color-text-secondary)' }}>
+                      {activeToolRoute.subtitle}
+                    </p>
+                  </div>
+
+                  <div className="pdf-card p-4 sm:p-6">
+                    <Suspense fallback={<ToolLoadingFallback />}>
+                      {renderToolById(activeToolRoute.toolId, activeToolRoute.defaultPresetId)}
+                    </Suspense>
+                  </div>
+                </section>
+
+                {/* Leaderboard Ad Placeholder safely separated below tool workspace */}
+                <div className="py-2">
+                  <AdSlot variant="leaderboard" />
+                </div>
+
+                {/* Unique 500+ word SEO Guide + Sidebar Ad Placeholder */}
+                <div className="grid items-start gap-8 lg:grid-cols-12">
+                  <div className="lg:col-span-9">
+                    <Suspense fallback={<div className="py-8 text-sm text-slate-500">Loading guide…</div>}>
+                      <ToolRouteGuide route={activeToolRoute} onNavigate={navigate} />
+                    </Suspense>
+                  </div>
+                  <div className="hidden lg:col-span-3 lg:block lg:sticky lg:top-24">
+                    <div className="space-y-4">
+                      <AdSlot variant="sidebar" />
+                      <div className="pdf-card p-4 text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                        <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--color-navy)' }}>
+                          <ShieldCheck className="h-4 w-4" style={{ color: 'var(--color-success)' }} aria-hidden="true" />
+                          Zero-Upload Guarantee
+                        </div>
+                        <p className="mt-1.5">
+                          Every conversion executes inside your browser tab. Disconnect Wi-Fi after page load and the tool still works.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Legal & Trust Pages */}
+            {currentPath === '/about' && (
+              <Suspense fallback={<ToolLoadingFallback />}>
+                <AboutPage onNavigate={navigate} />
+              </Suspense>
+            )}
+            {currentPath === '/contact' && (
+              <Suspense fallback={<ToolLoadingFallback />}>
+                <ContactPage />
+              </Suspense>
+            )}
+            {currentPath === '/privacy' && (
+              <Suspense fallback={<ToolLoadingFallback />}>
+                <PrivacyPage />
+              </Suspense>
+            )}
+            {currentPath === '/terms' && (
+              <Suspense fallback={<ToolLoadingFallback />}>
+                <TermsPage />
+              </Suspense>
+            )}
+          </div>
+        </main>
+
+        <Footer
+          onNavigate={navigate}
+          onOpenCookiePrefs={() => setIsCookiePrefsOpen(true)}
+        />
+
+        <CookieConsentBanner
+          choice={consent}
+          isPrefsOpen={isCookiePrefsOpen}
+          onUpdateChoice={setConsent}
+          onClosePrefs={() => setIsCookiePrefsOpen(false)}
+          onOpenPrefs={() => setIsCookiePrefsOpen(true)}
+          onNavigatePrivacy={() => {
+            setIsCookiePrefsOpen(false);
+            navigate('/privacy');
+          }}
+        />
+      </div>
     </ErrorBoundary>
   );
 }

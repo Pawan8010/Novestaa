@@ -25,7 +25,7 @@ const nodeEnv = process.env.NODE_ENV?.trim() || 'development';
 record(
   nodeEnv === 'production' ? 'PASS' : 'WARN',
   'NODE_ENV',
-  nodeEnv === 'production' ? 'production' : `"${nodeEnv}" (set NODE_ENV="production" on Hostinger)`
+  nodeEnv === 'production' ? 'production' : `"${nodeEnv}" (set NODE_ENV="production" in production)`
 );
 
 const appUrl = process.env.APP_URL?.trim() || '';
@@ -43,60 +43,7 @@ if (fs.existsSync(distIndex)) {
   record('FAIL', 'Frontend Build (dist/)', 'Missing dist/index.html — run "npm run build"');
 }
 
-// 3. Founder security
-const adminKey = process.env.FOUNDER_ADMIN_KEY?.trim() || '';
-record(
-  adminKey.length >= 12 ? 'PASS' : adminKey.length > 0 ? 'WARN' : 'FAIL',
-  'FOUNDER_ADMIN_KEY',
-  adminKey.length >= 12
-    ? 'Configured (strong length)'
-    : adminKey.length > 0
-      ? 'Configured, but shorter than 12 characters'
-      : 'Not set'
-);
-
-const sessionSecret = process.env.SESSION_SECRET?.trim() || '';
-record(
-  sessionSecret.length >= 32 ? 'PASS' : 'WARN',
-  'SESSION_SECRET',
-  sessionSecret.length >= 32
-    ? 'Configured (32+ chars)'
-    : 'Not explicitly set in .env (recommended: 64-char hex string)'
-);
-
-// 4. Razorpay Live Checkout & Webhook
-const rpKeyId = process.env.RAZORPAY_KEY_ID?.trim() || '';
-const rpSecret = process.env.RAZORPAY_KEY_SECRET?.trim() || '';
-const rpWebhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || '';
-
-if (rpKeyId && rpSecret) {
-  if (rpKeyId.startsWith('rzp_live_')) {
-    record('PASS', 'Razorpay API Keys', 'Live mode keys configured (rzp_live_...)');
-  } else if (rpKeyId.startsWith('rzp_test_')) {
-    record('WARN', 'Razorpay API Keys', 'Test mode keys configured (rzp_test_...) — switch to rzp_live_ for launch');
-  } else {
-    record('WARN', 'Razorpay API Keys', 'Configured (unrecognized key prefix)');
-  }
-} else {
-  record('FAIL', 'Razorpay API Keys', 'Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET');
-}
-
-record(
-  rpWebhookSecret.length >= 12 ? 'PASS' : rpWebhookSecret ? 'WARN' : 'FAIL',
-  'RAZORPAY_WEBHOOK_SECRET',
-  rpWebhookSecret ? 'Configured' : 'Not set (required in production for webhook verification)'
-);
-
-// 5. Maps key
-const mapsKey =
-  process.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
-record(
-  mapsKey ? 'PASS' : 'WARN',
-  'VITE_GOOGLE_MAPS_API_KEY',
-  mapsKey ? 'Configured (ensure npm run build was run after setting it)' : 'Not set (fallback map link will be used)'
-);
-
-// 6. Hostinger SMTP & live handshake test
+// 3. SMTP & Resend fallback email transport check
 const smtpHost = process.env.SMTP_HOST?.trim() || '';
 const smtpPort = Number(process.env.SMTP_PORT?.trim() || '465') || 465;
 const smtpUser = process.env.SMTP_USER?.trim() || '';
@@ -116,21 +63,21 @@ if (smtpHost && smtpUser && smtpPass) {
       socketTimeout: 12000,
     });
     await transporter.verify();
-    record('PASS', 'Hostinger SMTP Handshake', `Authenticated on ${smtpHost}:${smtpPort} as ${smtpUser}`);
+    record('PASS', 'SMTP Handshake', `Authenticated on ${smtpHost}:${smtpPort} as ${smtpUser}`);
   } catch (err) {
     record(
       'FAIL',
-      'Hostinger SMTP Handshake',
+      'SMTP Handshake',
       err instanceof Error ? err.message : 'SMTP verification failed'
     );
   }
 } else if (process.env.RESEND_API_KEY?.trim()) {
-  record('WARN', 'Email Transport', 'Hostinger SMTP not configured; falling back to RESEND_API_KEY');
+  record('WARN', 'Email Transport', 'SMTP not configured; falling back to RESEND_API_KEY');
 } else {
-  record('FAIL', 'Email Transport', 'Neither Hostinger SMTP (SMTP_*) nor RESEND_API_KEY is configured');
+  record('FAIL', 'Email Transport', 'Neither SMTP (SMTP_*) nor RESEND_API_KEY is configured');
 }
 
-// 7. Shared Cloud Persistence (Upstash Redis REST — optional for VPS, recommended for Render Free Tier)
+// 4. Shared Cloud Persistence (Upstash Redis REST — optional)
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim().replace(/\/$/, '') || '';
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || '';
 if (upstashUrl && upstashToken) {
@@ -155,7 +102,7 @@ if (upstashUrl && upstashToken) {
   record(
     'WARN',
     'Upstash Redis Cloud Sync',
-    'Not set (using local disk data/submissions.json — add Upstash keys on Render Free Tier)'
+    'Not set (using local disk data/submissions.json)'
   );
 }
 
